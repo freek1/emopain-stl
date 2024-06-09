@@ -1,0 +1,4 @@
+.env
+
+# large data files:
+data/*.pickle

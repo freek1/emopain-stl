@@ -3,7 +3,7 @@ import torch
 from torch.optim import AdamW
 from torch.utils.data import DataLoader, TensorDataset, WeightedRandomSampler
 import multiprocessing as mp
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, LeaveOneOut
 import os
 
 from utils.STL import SpikeThresholdLearning
@@ -11,8 +11,9 @@ from utils.RateCoder import RateCoder
 from utils.LatencyCoder import LatencyCoder
 from utils.EncoderLoss import EncoderLoss
 from utils.helpers import train_STL_encoder, classify_svm
+from utils.load_data import load_data_emopain
 
-def main(config: dict, input_data: torch.Tensor, target_labels: torch.Tensor, train_index: list, test_index: list, device: torch.device, folder: str):
+def main(config: dict, input_data: torch.Tensor, target_labels: torch.Tensor, fold_num: int, train_index: list, test_index: list, device: torch.device, folder: str):
     data_type = config["data_type"]
     batch_sz = config["batch_sz"]
     window_size = config["window_size"]
@@ -28,7 +29,6 @@ def main(config: dict, input_data: torch.Tensor, target_labels: torch.Tensor, tr
     drop_p = config["drop_p"]
     encoding_method = config["encoding_method"]
     avg_window_sz = config["avg_window_sz"]
-    fold_num = config["fold_num"]
     suff = config["suff"] # STL, rate, latency
     SVM = config["SVM"]
     SRNN = config["SRNN"]
@@ -82,7 +82,7 @@ def main(config: dict, input_data: torch.Tensor, target_labels: torch.Tensor, tr
     
     # Train the encoder, if method is STL
     if encoding_method == "STL":
-        encoder = train_STL_encoder(encoder, device, train_loader, val_loader, encoder_optimizer, encoder_loss_fn, encoder_epochs, folder)
+        encoder = train_STL_encoder(encoder, device, train_loader, val_loader, encoder_optimizer, encoder_loss_fn, encoder_epochs, folder, verbose=True)
     
     # Get/save the spike-trains
     if not os.path.exists(f"{folder}/spiketrains"):
@@ -117,6 +117,76 @@ if __name__ == "__main__":
     torch.manual_seed(1957)
     np.random.seed(1957)
     
+    device = torch.device("cpu")
     
+    data_type = "emg"
+    batch_sz = 4
+    window_size = 3000
+    stride = window_size // 4
+    n_spikes_per_timestep = 10
+    num_steps = 10
+    encoder_epochs = 75
+    classifier_epochs = 10
+    theta = 0.99
+    l1_sz = 3000
+    l2_sz = 3000
+    l1_cls = 3000
+    drop_p = 0.0
+    encoding_method = "STL"
+    avg_window_sz = 100
+    fold_num = 0
+
+    SVM = True
+    SRNN = False
     
-    main(config, input_data, target_labels, train_index, test_index, device, folder)
+    if encoding_method == "rate":
+        suff = "_rate"
+    elif encoding_method == "latency":
+        suff = "_latency"
+    else: suff = ""
+    
+    config = {
+        "data_type": data_type,
+        "batch_sz": batch_sz,
+        "window_size": window_size,
+        "stride": stride,
+        "n_spikes_per_timestep": n_spikes_per_timestep,
+        "num_steps": num_steps,
+        "encoder_epochs": encoder_epochs,
+        "classifier_epochs": classifier_epochs,
+        "theta": theta,
+        "l1_sz": l1_sz,
+        "l2_sz": l2_sz,
+        "l1_cls": l1_cls,
+        "drop_p": drop_p,
+        "encoding_method": encoding_method,
+        "avg_window_sz": avg_window_sz,
+        "suff": suff,
+        "SVM": SVM,
+        "SRNN": SRNN
+    }
+    
+    cv = LeaveOneOut()
+    input_data, target_labels = load_data_emopain(data_type)
+    print("data loaded: " )
+    
+    if SRNN:
+        folder = "emopain_srnn"
+    elif SVM:
+        folder = "emopain_svm"
+    if l1_sz > 0:
+        folder += "_S" # stacked
+    else:
+        folder += "_V" # vanilla
+        
+    os.makedirs(f"results/{folder}", exist_ok=True)
+    os.makedirs(f"imgs/{folder}", exist_ok=True) 
+
+    args = []
+    for fold_num, (train_index, test_index) in enumerate(cv.split(input_data, target_labels)):
+        args.append((config, input_data, target_labels, fold_num, train_index, test_index, device, folder))
+    
+        if len(args) == 1:
+            break
+    
+    main(*args[0])

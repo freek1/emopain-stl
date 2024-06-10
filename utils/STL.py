@@ -14,7 +14,7 @@ class RepeatLayer(torch.nn.Module):
 
 class SpikeThresholdLearning(torch.nn.Module):
     def __init__(self, 
-                 n_timesteps:int, 
+                 window_size:int, 
                  n_spikes_per_timestep:int,
                  n_channels:int, 
                  l1_sz:int,
@@ -22,14 +22,14 @@ class SpikeThresholdLearning(torch.nn.Module):
                  drop_p:float):        
         super().__init__()
 
-        self.n_timesteps = n_timesteps
+        self.window_size = window_size
         self.n_spikes_per_timestep = n_spikes_per_timestep
         self.n_channels = n_channels
         self.l1_sz = l1_sz
         self.l2_sz = l2_sz  
         self.drop_p = drop_p
 
-        input_size = n_timesteps * n_channels
+        input_size = window_size * n_channels
         output_size = input_size * n_spikes_per_timestep
 
         self.output_size = output_size

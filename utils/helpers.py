@@ -7,7 +7,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 
-from utils.STL import STL
+from utils.STL import SpikeThresholdLearning as STL
 from utils.EncoderLoss import EncoderLoss
 from utils.RecurrentClassifier import RecurrentClassifier
 

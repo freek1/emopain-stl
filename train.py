@@ -12,7 +12,7 @@ from utils.STL import SpikeThresholdLearning
 from utils.RateCoder import RateCoder
 from utils.LatencyCoder import LatencyCoder
 from utils.EncoderLoss import EncoderLoss
-from utils.helpers import train_STL_encoder, classify_svm
+from utils.helpers import train_STL_encoder, train_SRNN_classifier, classify_svm
 from utils.load_data import load_data_emopain
 
 def main(config: dict, input_data: torch.Tensor, target_labels: torch.Tensor, fold_num: int, train_index: list, test_index: list, device: torch.device, folder: str):
@@ -105,15 +105,16 @@ def main(config: dict, input_data: torch.Tensor, target_labels: torch.Tensor, fo
         classify_svm(train_labels, val_labels, test_labels, n_spikes_per_timestep, n_channels, folder, data_type, suff, fold_num, avg_window_sz)
         
     if SRNN:
-        classify_srnn()
+        classifier = train_SRNN_classifier(batch_sz, data_type, num_steps, encoder, l1_cls, window_size, stride, device, folder, suff, fold_num, classifier_epochs)
+        # classify_srnn()
         
 def generate_spiketrains(encoder, loader, fold_num, suff, split):
     batch_spiketrains = []
+    batch_labels = []
     for X, y in loader:
         spk_batch = []
         for window in range(0, X.size(1) - window_size + 1, window_size):
             X_window = X[:, window:window + window_size].to(device)
-            y = y.to(device)
             
             spiketrain, Z1, Z2 = encoder(X_window)
             spk_inputs = (spiketrain > theta).type(torch.float).cpu().detach().numpy()
@@ -121,16 +122,19 @@ def generate_spiketrains(encoder, loader, fold_num, suff, split):
         
         spk_batch = np.concatenate(spk_batch, axis=1)
         batch_spiketrains.append(spk_batch)
+        batch_labels.append(y)
     
     spiketrains = np.vstack(batch_spiketrains)
-    np.save(f"results/{folder}/spiketrains/{split}_{fold_num}{suff}.npy", spiketrains)
+    labels = np.hstack(batch_labels)
+    np.save(f"results/{folder}/spiketrains/{split}_{data_type}_{fold_num}{suff}.npy", spiketrains)
+    np.save(f"results/{folder}/spiketrains/labels_{split}_{data_type}_{fold_num}{suff}.npy", labels)
         
 if __name__ == "__main__":
     mp.set_start_method('spawn') # Fix for Linux systems deadlock
     torch.manual_seed(1957)
     np.random.seed(1957)
     
-    device = torch.device("cpu")
+    device = torch.device("cuda")
     
     data_type = "emg"
     batch_sz = 4
@@ -143,13 +147,13 @@ if __name__ == "__main__":
     theta = 0.99
     l1_sz = 0#3000
     l2_sz = 0#3000
-    l1_cls = 3000
+    l1_cls = 100
     drop_p = 0.0
     encoding_method = "rate"
     avg_window_sz = 100
 
-    SVM = True
-    SRNN = False
+    SVM = False
+    SRNN = True
     
     if encoding_method == "rate":
         suff = "_rate"

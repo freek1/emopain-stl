@@ -2,7 +2,7 @@ import torch
 import snntorch as snn
 
 class RecurrentClassifier(torch.nn.Module):
-    def __init__(self, encoder_output_size, lif_beta=0.5, l1_sz=1000, n_classes=2, window_size=1000, stride=800, num_steps=50):
+    def __init__(self, encoder_output_size: int, lif_beta: float, l1_sz: int, n_classes: int, num_steps: int):
         super().__init__()
         
         print("Using Recurrent Classifier: Recurrent LIF Neurons.")

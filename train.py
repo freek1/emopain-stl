@@ -15,6 +15,8 @@ from utils.EncoderLoss import EncoderLoss
 from utils.helpers import train_STL_encoder, train_SRNN_classifier, classify_svm
 from utils.load_data import load_data_emopain
 
+# See __main__ below for config settings.
+
 def main(config: dict, input_data: torch.Tensor, target_labels: torch.Tensor, fold_num: int, train_index: list, test_index: list, device: torch.device, folder: str):
     data_type = config["data_type"]
     batch_sz = config["batch_sz"]
@@ -92,7 +94,7 @@ def main(config: dict, input_data: torch.Tensor, target_labels: torch.Tensor, fo
     
     # Get/save the spike-trains
     os.makedirs(f"results/{folder}/spiketrains", exist_ok=True)
-    saved_spiketrains = glob.glob(f"results/{folder}/spiketrains/train_*{suff}.npy")
+    saved_spiketrains = glob.glob(f"results/{folder}/spiketrains/train_{data_type}_{fold_num}*{suff}.npy")
     if True: #len(saved_spiketrains) == 0:
         generate_spiketrains(encoder, train_loader, fold_num, suff, "train")
         generate_spiketrains(encoder, val_loader, fold_num, suff, "val")
@@ -136,22 +138,23 @@ if __name__ == "__main__":
     
     device = torch.device("cuda")
     
-    data_type = "emg"
-    batch_sz = 4
+    data_type = "emg" # emg, energy, angle
+    batch_sz = 16
     window_size = 3000
     stride = window_size // 4
-    n_spikes_per_timestep = 10
-    num_steps = 10
+    n_spikes_per_timestep = 10 
+    num_steps = 10 # Recurrent steps for the SRNN
     encoder_epochs = 15
     classifier_epochs = 10
-    theta = 0.99
-    l1_sz = 0#3000
-    l2_sz = 0#3000
-    l1_cls = 100
-    drop_p = 0.0
-    encoding_method = "rate"
+    theta = 0.99 # Threshold parameter for making spiketrains (semi-binary floats to actual ints)
+    l1_sz = 0#3000 # Size of the first layer in the STL encoder
+    l2_sz = 0#3000 # Size of the second layer in the STL encoder
+    l1_cls = 100 # Size of the layer in the classifier
+    drop_p = 0.0 # Dropout setting
+    encoding_method = "rate" # rate, latency, STL
     avg_window_sz = 100
 
+    # Set either one to True
     SVM = False
     SRNN = True
     
@@ -187,7 +190,7 @@ if __name__ == "__main__":
     
     cv = LeaveOneOut()
     input_data, target_labels = load_data_emopain(data_type)
-    print("data loaded: " )
+    print("Data loaded:", input_data.shape, target_labels.shape)
     
     if SRNN:
         folder = "emopain_srnn"
@@ -206,6 +209,7 @@ if __name__ == "__main__":
             df.set_index('fold', inplace=True)
             df.to_csv(f"results/{folder}/results_{data_type}{suff}.csv", index=True)
             
+        # Comment to run all subjects
         if len(args) == 1:
             break
     

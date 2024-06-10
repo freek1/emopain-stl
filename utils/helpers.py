@@ -75,7 +75,7 @@ def train_STL_encoder(encoder: STL, device: torch.device,
     return encoder
 
 def train_SRNN_classifier(batch_sz, data_type, num_steps, encoder, l1_cls, window_size, stride, device, folder, suff, fold_num, classifier_epochs):    
-    classifier = RecurrentClassifier(encoder.output_size, lif_beta=0.5, num_steps=num_steps, l1_sz=l1_cls, n_classes=2, window_size=window_size, stride=stride)
+    classifier = RecurrentClassifier(encoder.output_size, lif_beta=0.5, num_steps=num_steps, l1_sz=l1_cls, n_classes=2)
     print(f"Classifier params: \t{sum(p.numel() for p in classifier.parameters() if p.requires_grad)}")
     
     classifier.to(device)
@@ -138,7 +138,7 @@ def train_SRNN_classifier(batch_sz, data_type, num_steps, encoder, l1_cls, windo
             epoch_val_correct = 0
             epoch_val_total = 0
             for batch_idx in range(0, val_spiketrains.shape[0], batch_sz):
-                y = val_labels[batch_idx:batch_idx+batch_sz].to(device)
+                y = val_labels[batch_idx:batch_idx+batch_sz].long().to(device)
                 for window in range(0, val_spiketrains.shape[1] - encoder.output_size + 1, stride):
                     W_window = val_spiketrains[batch_idx:batch_idx+batch_sz, window:window + encoder.output_size].to(device)
                     

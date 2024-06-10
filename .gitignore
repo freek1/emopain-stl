@@ -4,3 +4,6 @@
 data/*.pickle
 
 */__pycache__
+
+# Large encoder and classifier models
+*.pth

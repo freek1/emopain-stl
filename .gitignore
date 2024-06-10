@@ -2,3 +2,5 @@
 
 # large data files:
 data/*.pickle
+
+*/__pycache__

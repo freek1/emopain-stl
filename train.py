@@ -5,6 +5,7 @@ from torch.utils.data import DataLoader, TensorDataset, WeightedRandomSampler
 import multiprocessing as mp
 from sklearn.model_selection import train_test_split, LeaveOneOut
 import os
+import glob
 
 from utils.STL import SpikeThresholdLearning
 from utils.RateCoder import RateCoder
@@ -39,7 +40,7 @@ def main(config: dict, input_data: torch.Tensor, target_labels: torch.Tensor, fo
     test_data, test_labels = input_data[test_index], target_labels[test_index]
     train_data, val_data, train_labels, val_labels = train_test_split(input_data[train_index], target_labels[train_index], test_size=0.2, random_state=42)
     
-    n_samples, n_channels, n_timesteps = train_data.shape
+    n_samples, n_timesteps, n_channels = train_data.shape
     
     # Create datasets
     train_dataset = TensorDataset(train_data, train_labels)
@@ -58,11 +59,10 @@ def main(config: dict, input_data: torch.Tensor, target_labels: torch.Tensor, fo
     
     # Create the WeightedRandomSampler
     # NOTE: num_samples = batch_sz*2, since we want to over-sample the minority class.
-    num_samples = batch_sz * 2
-    sampler = WeightedRandomSampler(weights, num_samples=num_samples, replacement=True)
+    sampler = WeightedRandomSampler(weights, num_samples=len(train_labels), replacement=True)
 
     # Create DataLoaders with the sampler
-    train_loader = DataLoader(train_dataset, batch_size=num_samples, sampler=sampler)
+    train_loader = DataLoader(train_dataset, batch_size=batch_sz, sampler=sampler)
     val_loader = DataLoader(val_dataset, batch_size=batch_sz, shuffle=False)
     test_loader = DataLoader(test_dataset, batch_size=batch_sz, shuffle=False)
     
@@ -82,35 +82,46 @@ def main(config: dict, input_data: torch.Tensor, target_labels: torch.Tensor, fo
     
     # Train the encoder, if method is STL
     if encoding_method == "STL":
-        encoder = train_STL_encoder(encoder, device, train_loader, val_loader, encoder_optimizer, encoder_loss_fn, encoder_epochs, folder, verbose=True)
+        encoder = train_STL_encoder(encoder, device,
+                      train_loader, val_loader,
+                      encoder_optimizer, encoder_loss_fn,
+                      encoder_epochs, window_size,
+                      stride, folder,
+                      verbose = True)
     
     # Get/save the spike-trains
-    if not os.path.exists(f"{folder}/spiketrains"):
-        os.makedirs(f"{folder}/spiketrains")
-        
-        with torch.no_grad():
-            for i_subject, (X, y) in enumerate(train_loader):
-                spk_subj = []
-                for window in range(0, X.size(2) - window_size, window_size): # NOTE: No stride here
-                    X_window = X[:, :, window:window + window_size]
-                    X_window = X_window.to(device)
-                    y = y.to(device)
-                    
-                    spiketrain, Z1, Z2 = encoder(X_window)
-                    spk_inputs = (spiketrain > theta).type(torch.float).cpu().detach().numpy()
-                    spk_subj = np.append(spk_subj, spk_inputs)
-                np.save(f"spiketrains/{folder}/spiketrain_{i_subject}_{suff}.npy", spk_subj.flatten())
-                
-                # TODO: Compute sparsity here!!! And save with
-    else:
-        print("Spiketrains already exist. Skipping...")
-         
+    saved_spiketrains = glob.glob(f"results/{folder}/spiketrains/train_*{suff}.npy")
+    if True: #len(saved_spiketrains) == 0:
+        generate_spiketrains(encoder, train_loader, fold_num, suff, "train")
+        generate_spiketrains(encoder, val_loader, fold_num, suff, "val")
+        generate_spiketrains(encoder, test_loader, fold_num, suff, "test")
+    else:    
+        print("Spiketrains already generated.")
+    
     # Initialize the classifier
     if SVM:
-        classify_svm(train_labels, test_labels, encoder, n_timesteps, window_size, n_spikes_per_timestep, n_channels, theta, folder, data_type, suff, fold_num, avg_window_sz)
+        classify_svm(train_labels, val_labels, test_labels, n_spikes_per_timestep, n_channels, folder, data_type, suff, fold_num, avg_window_sz)
         
     if SRNN:
         classify_srnn()
+        
+def generate_spiketrains(encoder, loader, fold_num, suff, split):
+    batch_spiketrains = []
+    for X, y in loader:
+        spk_batch = []
+        for window in range(0, X.size(1) - window_size + 1, window_size):
+            X_window = X[:, window:window + window_size].to(device)
+            y = y.to(device)
+            
+            spiketrain, Z1, Z2 = encoder(X_window)
+            spk_inputs = (spiketrain > theta).type(torch.float).cpu().detach().numpy()
+            spk_batch.append(spk_inputs)
+        
+        spk_batch = np.concatenate(spk_batch, axis=1)
+        batch_spiketrains.append(spk_batch)
+    
+    spiketrains = np.vstack(batch_spiketrains)
+    np.save(f"results/{folder}/spiketrains/{split}_{fold_num}{suff}.npy", spiketrains)
         
 if __name__ == "__main__":
     mp.set_start_method('spawn') # Fix for Linux systems deadlock
@@ -125,11 +136,11 @@ if __name__ == "__main__":
     stride = window_size // 4
     n_spikes_per_timestep = 10
     num_steps = 10
-    encoder_epochs = 75
+    encoder_epochs = 15
     classifier_epochs = 10
     theta = 0.99
-    l1_sz = 3000
-    l2_sz = 3000
+    l1_sz = 0#3000
+    l2_sz = 0#3000
     l1_cls = 3000
     drop_p = 0.0
     encoding_method = "STL"
@@ -143,7 +154,10 @@ if __name__ == "__main__":
         suff = "_rate"
     elif encoding_method == "latency":
         suff = "_latency"
-    else: suff = ""
+    elif encoding_method == "STL" and l1_sz == 0:
+        suff = "_STL-V"
+    elif encoding_method == "STL" and l1_sz > 0:
+        suff = "_STL-S"
     
     config = {
         "data_type": data_type,
@@ -174,10 +188,6 @@ if __name__ == "__main__":
         folder = "emopain_srnn"
     elif SVM:
         folder = "emopain_svm"
-    if l1_sz > 0:
-        folder += "_S" # stacked
-    else:
-        folder += "_V" # vanilla
         
     os.makedirs(f"results/{folder}", exist_ok=True)
     os.makedirs(f"imgs/{folder}", exist_ok=True) 

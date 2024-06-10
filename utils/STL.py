@@ -7,7 +7,6 @@ class RepeatLayer(torch.nn.Module):
         assert target_size % source_size == 0, f"target_size must be a multiple of source_size: source={source_size}, target={target_size}."
         
         self.repeat_param = target_size // source_size
-        print(self.repeat_param)
 
     def forward(self, x):
         return x.repeat_interleave(self.repeat_param, dim=1)

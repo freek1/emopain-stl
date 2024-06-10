@@ -2,10 +2,10 @@ import torch
 from snntorch import spikegen
 
 class RateCoder(torch.nn.Module):
-    def __init__(self, n_timesteps, n_channels, n_spikes_per_timestep):        
+    def __init__(self, window_size, n_channels, n_spikes_per_timestep):        
         super().__init__()
 
-        self.output_size = n_timesteps * n_channels * n_spikes_per_timestep
+        self.output_size = window_size * n_channels * n_spikes_per_timestep
         self.n_spikes_per_timestep = n_spikes_per_timestep
 
     def forward(self, x):

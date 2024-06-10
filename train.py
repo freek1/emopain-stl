@@ -4,6 +4,7 @@ from torch.optim import AdamW
 from torch.utils.data import DataLoader, TensorDataset, WeightedRandomSampler
 import multiprocessing as mp
 from sklearn.model_selection import train_test_split, LeaveOneOut
+import pandas as pd
 import os
 import glob
 
@@ -87,9 +88,10 @@ def main(config: dict, input_data: torch.Tensor, target_labels: torch.Tensor, fo
                       encoder_optimizer, encoder_loss_fn,
                       encoder_epochs, window_size,
                       stride, folder,
-                      verbose = True)
+                      suff, verbose = True)
     
     # Get/save the spike-trains
+    os.makedirs(f"results/{folder}/spiketrains", exist_ok=True)
     saved_spiketrains = glob.glob(f"results/{folder}/spiketrains/train_*{suff}.npy")
     if True: #len(saved_spiketrains) == 0:
         generate_spiketrains(encoder, train_loader, fold_num, suff, "train")
@@ -143,9 +145,8 @@ if __name__ == "__main__":
     l2_sz = 0#3000
     l1_cls = 3000
     drop_p = 0.0
-    encoding_method = "STL"
+    encoding_method = "rate"
     avg_window_sz = 100
-    fold_num = 0
 
     SVM = True
     SRNN = False
@@ -196,6 +197,11 @@ if __name__ == "__main__":
     for fold_num, (train_index, test_index) in enumerate(cv.split(input_data, target_labels)):
         args.append((config, input_data, target_labels, fold_num, train_index, test_index, device, folder))
     
+        if not os.path.exists(f"results/{folder}/results_{data_type}{suff}.csv"):
+            df = pd.DataFrame(columns=["fold", "train_acc", "val_acc", "test_acc", "test_preds", "test_labels", "sparsity"])
+            df.set_index('fold', inplace=True)
+            df.to_csv(f"results/{folder}/results_{data_type}{suff}.csv", index=True)
+            
         if len(args) == 1:
             break
     

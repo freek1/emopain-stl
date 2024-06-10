@@ -7,6 +7,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 import glob
+import pandas as pd
 
 from utils.STL import SpikeThresholdLearning as STL
 from utils.EncoderLoss import EncoderLoss
@@ -17,7 +18,7 @@ def train_STL_encoder(encoder: STL, device: torch.device,
                       encoder_optimizer: AdamW, encoder_loss_fn: EncoderLoss,
                       encoder_epochs: int, window_size: int,
                       stride: int, folder: str,
-                      verbose: bool = True):
+                      suff: str, verbose: bool = True):
     enc_loss = []
     enc_loss_val = []
     
@@ -65,14 +66,14 @@ def train_STL_encoder(encoder: STL, device: torch.device,
             torch.save(best_encoder, f"results/{folder}/best_encoder.pth")
     
     if verbose:
-        save_loss_plot(enc_loss, enc_loss_val, folder)
+        save_loss_plot(enc_loss, enc_loss_val, folder, suff)
     
     encoder.load_state_dict(torch.load(f"results/{folder}/best_encoder.pth"))
     encoder.eval()
     
     return encoder
 
-def save_loss_plot(enc_loss: list, enc_loss_val: list, folder: str):
+def save_loss_plot(enc_loss: list, enc_loss_val: list, folder: str, suff: str):
     plt.figure(figsize=(8,6))
     plt.plot(enc_loss, label="train")
     plt.plot(enc_loss_val, label="val")
@@ -80,7 +81,7 @@ def save_loss_plot(enc_loss: list, enc_loss_val: list, folder: str):
     plt.xlabel("Epoch")
     plt.ylabel("Loss")
     plt.title(f"Encoder Loss")
-    plt.savefig(f"imgs/{folder}/encoder_loss.png")
+    plt.savefig(f"imgs/{folder}/encoder_loss{suff}.png")
     plt.close()
 
 def classify_svm(train_labels, val_labels, test_labels, n_spikes_per_timestep, n_channels, folder, data_type, suff, fold_num, avg_window_sz):
@@ -134,9 +135,19 @@ def classify_svm(train_labels, val_labels, test_labels, n_spikes_per_timestep, n
     
     print(f"Test Accuracy: \t\t{ts_acc:.3f}%")
     
-    with open(f"results/{folder}/results_{data_type}{suff}.csv", "a") as f:
-        # fold_num, train_acc, val_acc, test_acc, test_pred, test_label, sparsity
-        f.write(f"{fold_num},{-1},{-1},{ts_acc:.3f},{test_preds.item()},{test_labels.item()},{sparsity}\n")
+    # Save results
+    results_file = pd.read_csv(f"results/{folder}/results_{data_type}{suff}.csv", index_col=0)
+    results = pd.DataFrame([{
+        'fold': fold_num, 
+        'train_acc': -1, 
+        'val_acc': -1, 
+        'test_acc': ts_acc, 
+        'test_preds': test_preds, 
+        'test_labels': test_labels.numpy(), 
+        'sparsity': sparsity
+    }])
+    results_file = pd.concat([results_file, results])
+    results_file.to_csv(f"results/{folder}/results_{data_type}{suff}.csv")
     
     idx = 0
     
@@ -160,7 +171,7 @@ def classify_svm(train_labels, val_labels, test_labels, n_spikes_per_timestep, n
     colors = np.array(cs)[channels]
     
     plt.scatter(pixels, y_pos, color=colors, marker='o', s=2)
-    plt.title(f"{data_type.capitalize()} - Fold {fold_num+1} (y={y0})")
+    plt.title(f"{data_type.capitalize()} - Fold {fold_num} (y={y0})")
     plt.xlabel("Time")
     plt.ylabel("Value")
     plt.tight_layout()
@@ -173,7 +184,7 @@ def classify_svm(train_labels, val_labels, test_labels, n_spikes_per_timestep, n
     plt.legend(bbox_to_anchor=(1.05, 1.0), loc='upper left')
     plt.tight_layout()
     
-    plt.savefig(f"imgs/{folder}/spiketrain_svm_{data_type}{suff}_{fold_num+1}.png")
+    plt.savefig(f"imgs/{folder}/spiketrain_svm_{data_type}{suff}_{fold_num}.png")
     plt.close()
 
     return

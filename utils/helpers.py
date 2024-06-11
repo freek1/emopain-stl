@@ -34,6 +34,8 @@ def train_STL_encoder(encoder: STL, device: torch.device,
             for window in range(0, X.size(1) - window_size, stride):
                 X_window = X[:, window:window + window_size]
                 X_window = X_window.to(device)
+                X_window = X_window.nan_to_num_(0)
+                
                 X_flat = X_window.view(X_window.shape[0], -1)
                 y = y.to(device)
                 encoder_optimizer.zero_grad()
@@ -54,6 +56,8 @@ def train_STL_encoder(encoder: STL, device: torch.device,
                 for window in range(0, X.size(1) - window_size, stride):
                     X_window = X[:, window:window + window_size]
                     X_window = X_window.to(device)
+                    X_window = X_window.nan_to_num_(0)
+                    
                     X_flat = X_window.view(X_window.shape[0], -1)
                     y = y.to(device)
                     W, Z1, Z2 = encoder(X_window)

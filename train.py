@@ -102,7 +102,7 @@ def main(config: dict, input_data: torch.Tensor, target_labels: torch.Tensor, fo
         generate_spiketrains(encoder, val_loader, fold_num, suff, "val", data_type)
         generate_spiketrains(encoder, test_loader, fold_num, suff, "test", data_type)
     else:    
-        print("Spiketrains already generated.")
+        print("Spiketrains already generated: ", f"results/{folder}/spiketrains/train_{data_type}_{fold_num}{suff}.npy")
     
     # Initialize the classifier
     if SVM:
@@ -165,7 +165,7 @@ if __name__ == "__main__":
     l2_sz = 0#3000 # Size of the second layer in the STL encoder
     l1_cls = 3000 # Size of the layer in the classifier
     drop_p = 0.0 # Dropout setting
-    encoding_method = "STL" # rate, latency, STL
+    encoding_method = "rate" # rate, latency, STL
     # NOTE: To activate the STL-Stacked, set l1sz (and l2sz) to your liking > 0
     # To use STL-Vanilla, set l1_sz=l2_sz=0.
     avg_window_sz = 100 # For averaging the spiketrains to use as features for the SVM classifier

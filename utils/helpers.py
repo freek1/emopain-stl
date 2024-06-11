@@ -207,7 +207,7 @@ def save_cls_loss_plot(cls_loss: list, cls_loss_val: list, folder: str, suff: st
 def classify_svm(n_spikes_per_timestep, n_channels, folder, data_type, suff, fold_num, avg_window_sz):
     classifier_svm = SVC(kernel='linear', C=1.0, random_state=1957)
     print("Training SVM...")
-    
+
     train_spiketrains = np.load(f"results/{folder}/spiketrains/train_{data_type}_{fold_num}{suff}.npy")
     train_labels = np.load(f"results/{folder}/spiketrains/labels_train_{data_type}_{fold_num}{suff}.npy")
     val_spiketrains = np.load(f"results/{folder}/spiketrains/val_{data_type}_{fold_num}{suff}.npy")

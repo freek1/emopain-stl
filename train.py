@@ -1,3 +1,4 @@
+import csv
 import numpy as np
 import torch
 from torch.optim import AdamW
@@ -6,6 +7,7 @@ import multiprocessing as mp
 from sklearn.model_selection import train_test_split, LeaveOneOut
 import pandas as pd
 import os
+import time
 import glob
 
 from utils.STL import SpikeThresholdLearning
@@ -89,8 +91,8 @@ def main(config: dict, input_data: torch.Tensor, target_labels: torch.Tensor, fo
                       train_loader, val_loader,
                       encoder_optimizer, encoder_loss_fn,
                       encoder_epochs, window_size,
-                      stride, folder,
-                      suff, verbose = True)
+                      stride, folder, data_type,
+                      fold_num, suff, verbose = True)
     
     # Get/save the spike-trains
     os.makedirs(f"results/{folder}/spiketrains", exist_ok=True)
@@ -130,6 +132,16 @@ def generate_spiketrains(encoder, loader, fold_num, suff, split):
     labels = np.hstack(batch_labels)
     np.save(f"results/{folder}/spiketrains/{split}_{data_type}_{fold_num}{suff}.npy", spiketrains)
     np.save(f"results/{folder}/spiketrains/labels_{split}_{data_type}_{fold_num}{suff}.npy", labels)
+    
+    # For test, we compute the sparsity, since its the single subject (then we have 1 for each subj)
+    if split == "test":
+        n_spikes = np.sum(spiketrains)
+        total_spikes = np.prod(spiketrains.shape)
+        sparsity = n_spikes / total_spikes
+
+        with open(f'results/{folder}/spiketrains/sparsities_{data_type}{suff}.csv', mode='a', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow([fold_num, sparsity])
         
 if __name__ == "__main__":
     mp.set_start_method('spawn') # Fix for Linux systems deadlock
@@ -137,26 +149,28 @@ if __name__ == "__main__":
     np.random.seed(1957)
     
     device = torch.device("cuda")
-    
-    data_type = "emg" # emg, energy, angle
+
+    data_types = ["emg", "energy", "angle"] # emg, energy, angle
     batch_sz = 16
     window_size = 3000
     stride = window_size // 4
     n_spikes_per_timestep = 10 
     num_steps = 10 # Recurrent steps for the SRNN
-    encoder_epochs = 15
+    encoder_epochs = 30
     classifier_epochs = 10
     theta = 0.99 # Threshold parameter for making spiketrains (semi-binary floats to actual ints)
-    l1_sz = 0#3000 # Size of the first layer in the STL encoder
-    l2_sz = 0#3000 # Size of the second layer in the STL encoder
-    l1_cls = 100 # Size of the layer in the classifier
+    l1_sz = 3000 # Size of the first layer in the STL encoder
+    l2_sz = 3000 # Size of the second layer in the STL encoder
+    l1_cls = 3000 # Size of the layer in the classifier
     drop_p = 0.0 # Dropout setting
-    encoding_method = "rate" # rate, latency, STL
-    avg_window_sz = 100
+    encoding_method = "STL" # rate, latency, STL
+    # NOTE: To activate the STL-Stacked, set l1sz (and l2sz) to your liking > 0
+    # To use STL-Vanilla, set l1_sz=l2_sz=0.
+    avg_window_sz = 100 # For averaging the spiketrains to use as features for the SVM classifier
 
     # Set either one to True
-    SVM = False
-    SRNN = True
+    SVM = True
+    SRNN = False
     
     if encoding_method == "rate":
         suff = "_rate"
@@ -167,50 +181,61 @@ if __name__ == "__main__":
     elif encoding_method == "STL" and l1_sz > 0:
         suff = "_STL-S"
     
-    config = {
-        "data_type": data_type,
-        "batch_sz": batch_sz,
-        "window_size": window_size,
-        "stride": stride,
-        "n_spikes_per_timestep": n_spikes_per_timestep,
-        "num_steps": num_steps,
-        "encoder_epochs": encoder_epochs,
-        "classifier_epochs": classifier_epochs,
-        "theta": theta,
-        "l1_sz": l1_sz,
-        "l2_sz": l2_sz,
-        "l1_cls": l1_cls,
-        "drop_p": drop_p,
-        "encoding_method": encoding_method,
-        "avg_window_sz": avg_window_sz,
-        "suff": suff,
-        "SVM": SVM,
-        "SRNN": SRNN
-    }
-    
-    cv = LeaveOneOut()
-    input_data, target_labels = load_data_emopain(data_type)
-    print("Data loaded:", input_data.shape, target_labels.shape)
-    
-    if SRNN:
-        folder = "emopain_srnn"
-    elif SVM:
-        folder = "emopain_svm"
+    for data_type in data_types:
+        config = {
+            "data_type": data_type,
+            "batch_sz": batch_sz,
+            "window_size": window_size,
+            "stride": stride,
+            "n_spikes_per_timestep": n_spikes_per_timestep,
+            "num_steps": num_steps,
+            "encoder_epochs": encoder_epochs,
+            "classifier_epochs": classifier_epochs,
+            "theta": theta,
+            "l1_sz": l1_sz,
+            "l2_sz": l2_sz,
+            "l1_cls": l1_cls,
+            "drop_p": drop_p,
+            "encoding_method": encoding_method,
+            "avg_window_sz": avg_window_sz,
+            "suff": suff,
+            "SVM": SVM,
+            "SRNN": SRNN
+        }
         
-    os.makedirs(f"results/{folder}", exist_ok=True)
-    os.makedirs(f"imgs/{folder}", exist_ok=True) 
-
-    args = []
-    for fold_num, (train_index, test_index) in enumerate(cv.split(input_data, target_labels)):
-        args.append((config, input_data, target_labels, fold_num, train_index, test_index, device, folder))
-    
-        if not os.path.exists(f"results/{folder}/results_{data_type}{suff}.csv"):
-            df = pd.DataFrame(columns=["fold", "train_acc", "val_acc", "test_acc", "test_preds", "test_labels", "sparsity"])
-            df.set_index('fold', inplace=True)
-            df.to_csv(f"results/{folder}/results_{data_type}{suff}.csv", index=True)
+        cv = LeaveOneOut()
+        input_data, target_labels = load_data_emopain(data_type)
+        print(f"{data_type.capitalize()} data loaded:", input_data.shape, target_labels.shape)
+        
+        if SRNN:
+            folder = "emopain_srnn"
+        elif SVM:
+            folder = "emopain_svm"
             
-        # Comment to run all subjects
-        if len(args) == 1:
-            break
+        os.makedirs(f"results/{folder}", exist_ok=True)
+        os.makedirs(f"imgs/{folder}", exist_ok=True) 
+
+        args = []
+        for fold_num, (train_index, test_index) in enumerate(cv.split(input_data, target_labels)):
+            args.append((config, input_data, target_labels, fold_num, train_index, test_index, device, folder))
+        
+            if not os.path.exists(f"results/{folder}/results_{data_type}{suff}.csv"):
+                df = pd.DataFrame(columns=["fold", "train_acc", "val_acc", "test_acc", "test_preds", "test_labels", "sparsity"])
+                df.set_index('fold', inplace=True)
+                df.to_csv(f"results/{folder}/results_{data_type}{suff}.csv", index=True)
+                
+                # To save sparsities for each subj
+                with open(f'results/{folder}/spiketrains/sparsities_{data_type}{suff}.csv', mode='w', newline='') as file:
+                    writer = csv.writer(file)
+                    writer.writerow(['fold', 'sparsity'])
+                
+            # Comment to run all subjects
+            # if len(args) == 1:
+            #     break
     
-    main(*args[0])
+    print(f"Starting {len(args)} runs...")
+    start = time.time()
+    for arg in args:
+        main(*arg)
+    end = time.time()
+    print(f"{len(args)} runs took {(end-start)/60:.2f} minutes.")

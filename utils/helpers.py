@@ -18,8 +18,8 @@ def train_STL_encoder(encoder: STL, device: torch.device,
                       train_loader: DataLoader, val_loader: DataLoader,
                       encoder_optimizer: AdamW, encoder_loss_fn: EncoderLoss,
                       encoder_epochs: int, window_size: int,
-                      stride: int, folder: str,
-                      suff: str, verbose: bool = True):
+                      stride: int, folder: str, data_type: str,
+                      fold_num:int, suff: str, verbose: bool = True):
     enc_loss = []
     enc_loss_val = []
     
@@ -64,12 +64,12 @@ def train_STL_encoder(encoder: STL, device: torch.device,
         if epoch_val_loss < lowest_enc_val_loss:
             lowest_enc_val_loss = epoch_val_loss
             best_encoder = encoder.state_dict()
-            torch.save(best_encoder, f"results/{folder}/best_encoder.pth")
+            torch.save(best_encoder, f"results/{folder}/best_encoder_{data_type}{suff}.pth")
     
     if verbose:
-        save_enc_loss_plot(enc_loss, enc_loss_val, folder, suff)
+        save_enc_loss_plot(enc_loss, enc_loss_val, folder, suff, fold_num)
     
-    encoder.load_state_dict(torch.load(f"results/{folder}/best_encoder.pth"))
+    encoder.load_state_dict(torch.load(f"results/{folder}/best_encoder_{data_type}{suff}.pth"))
     encoder.eval()
     
     return encoder
@@ -178,7 +178,7 @@ def train_SRNN_classifier(batch_sz, data_type, num_steps, encoder, l1_cls, windo
     
     return classifier
 
-def save_enc_loss_plot(enc_loss: list, enc_loss_val: list, folder: str, suff: str):
+def save_enc_loss_plot(enc_loss: list, enc_loss_val: list, folder: str, suff: str, fold_num: int):
     plt.figure(figsize=(8,6))
     plt.plot(enc_loss, label="train")
     plt.plot(enc_loss_val, label="val")
@@ -186,7 +186,7 @@ def save_enc_loss_plot(enc_loss: list, enc_loss_val: list, folder: str, suff: st
     plt.xlabel("Epoch")
     plt.ylabel("Loss")
     plt.title(f"Encoder Loss")
-    plt.savefig(f"imgs/{folder}/encoder_loss{suff}.png")
+    plt.savefig(f"imgs/{folder}/encoder_loss{suff}_{fold_num}.png")
     plt.close()
     
 def save_cls_loss_plot(cls_loss: list, cls_loss_val: list, folder: str, suff: str, data_type: str):

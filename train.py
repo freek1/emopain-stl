@@ -98,6 +98,7 @@ def main(config: dict, input_data: torch.Tensor, target_labels: torch.Tensor, fo
     os.makedirs(f"results/{folder}/spiketrains", exist_ok=True)
     saved_spiketrains = glob.glob(f"results/{folder}/spiketrains/train_{data_type}_{fold_num}{suff}.npy")
     if len(saved_spiketrains) == 0:
+        print(f"Generating spiketrain...: results/{folder}/spiketrains/train_{data_type}_{fold_num}{suff}.npy")
         generate_spiketrains(encoder, train_loader, fold_num, suff, "train", data_type)
         generate_spiketrains(encoder, val_loader, fold_num, suff, "val", data_type)
         generate_spiketrains(encoder, test_loader, fold_num, suff, "test", data_type)
@@ -163,9 +164,9 @@ if __name__ == "__main__":
     theta = 0.99 # Threshold parameter for making spiketrains (semi-binary floats to actual ints)
     l1_sz = 0#3000 # Size of the first layer in the STL encoder
     l2_sz = 0#3000 # Size of the second layer in the STL encoder
-    l1_cls = 3000 # Size of the layer in the classifier
+    l1_cls = 1000 # Size of the layer in the classifier
     drop_p = 0.0 # Dropout setting
-    encoding_method = "latency" # rate, latency, STL
+    encoding_method = "STL" # rate, latency, STL
     # NOTE: To activate the STL-Stacked, set l1sz (and l2sz) to your liking > 0
     # To use STL-Vanilla, set l1_sz=l2_sz=0.
     avg_window_sz = 100 # For averaging the spiketrains to use as features for the SVM classifier
@@ -220,6 +221,7 @@ if __name__ == "__main__":
 
         for fold_num, (train_index, test_index) in enumerate(cv.split(input_data, target_labels)):
             cls = "svm" if SVM else "srnn" if SRNN else "---"
+            # Check if the spiketrain image is generated, if so, no need to compute whole fold again. 
             if os.path.exists(f"imgs/{folder}/spiketrain_{cls}_{data_type}{suff}_{fold_num}.png"):    
                 print("Skipping fold", fold_num, data_type, suff)
                 continue 

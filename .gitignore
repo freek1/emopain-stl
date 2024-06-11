@@ -7,3 +7,4 @@ data/*.pickle
 
 # Large encoder and classifier models
 *.pth
+*.npy

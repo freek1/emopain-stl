@@ -39,7 +39,7 @@ def main(config: dict, input_data: torch.Tensor, target_labels: torch.Tensor, fo
     SVM = config["SVM"]
     SRNN = config["SRNN"]
     
-    print(f"FOLDER = '{folder}'")
+    print(f"FOLDER = '{folder} {encoding_method} {data_type}{suff}'")
 
     # Split into test, val and train
     test_data, test_labels = input_data[test_index], target_labels[test_index]
@@ -165,7 +165,7 @@ if __name__ == "__main__":
     l2_sz = 0#3000 # Size of the second layer in the STL encoder
     l1_cls = 3000 # Size of the layer in the classifier
     drop_p = 0.0 # Dropout setting
-    encoding_method = "rate" # rate, latency, STL
+    encoding_method = "latency" # rate, latency, STL
     # NOTE: To activate the STL-Stacked, set l1sz (and l2sz) to your liking > 0
     # To use STL-Vanilla, set l1_sz=l2_sz=0.
     avg_window_sz = 100 # For averaging the spiketrains to use as features for the SVM classifier

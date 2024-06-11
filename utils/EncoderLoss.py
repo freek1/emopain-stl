@@ -72,7 +72,7 @@ def compute_mutual_information(X, Z):
         if X.size(2) == 1:
             X = X.squeeze(2)
     
-    eps = 1e-12
+    eps = torch.tensor(1e-12, dtype=torch.float32)
     joint_prob = torch.mean(torch.multiply(X, Z))
     px = torch.mean(X) # Marginal probability of X
     # px = px if px > 0 else eps
@@ -81,9 +81,9 @@ def compute_mutual_information(X, Z):
     assert pz >= 0, f"Marginal prob. of Z is smaller than 0, pz: {pz}"
     
     if joint_prob == 0 or px == 0 or pz == 0:
-        joint_prob = max(joint_prob, eps)
-        px = max(px, eps)
-        pz = max(pz, eps)
+        joint_prob = torch.max(joint_prob, eps)
+        px = torch.max(px, eps)
+        pz = torch.max(pz, eps)
         
     mutual_information = joint_prob * torch.log2((joint_prob) / px * pz)
     return mutual_information

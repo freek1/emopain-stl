@@ -200,35 +200,22 @@ def save_cls_loss_plot(cls_loss: list, cls_loss_val: list, folder: str, suff: st
     plt.savefig(f"imgs/{folder}/classifier_loss_{data_type}{suff}.png")
     plt.close()
 
-def classify_svm(train_labels, val_labels, test_labels, n_spikes_per_timestep, n_channels, folder, data_type, suff, fold_num, avg_window_sz):
+def classify_svm(n_spikes_per_timestep, n_channels, folder, data_type, suff, fold_num, avg_window_sz):
     classifier_svm = SVC(kernel='linear', C=1.0, random_state=1957)
     print("Training SVM...")
     
-    train_spiketrains = glob.glob(f"results/{folder}/spiketrains/train_{data_type}_{fold_num}*{suff}.npy")
-    val_spiketrains = glob.glob(f"results/{folder}/spiketrains/val_{data_type}_{fold_num}*{suff}.npy")
-    test_spiketrains = glob.glob(f"results/{folder}/spiketrains/test_{data_type}_{fold_num}*{suff}.npy")
+    train_spiketrains = np.load(f"results/{folder}/spiketrains/train_{data_type}_{fold_num}{suff}.npy")
+    train_labels = np.load(f"results/{folder}/spiketrains/labels_train_{data_type}_{fold_num}{suff}.npy")
+    val_spiketrains = np.load(f"results/{folder}/spiketrains/val_{data_type}_{fold_num}{suff}.npy")
+    val_labels = np.load(f"results/{folder}/spiketrains/labels_val_{data_type}_{fold_num}{suff}.npy")
+    test_spiketrains = np.load(f"results/{folder}/spiketrains/test_{data_type}_{fold_num}{suff}.npy")
+    test_labels = np.load(f"results/{folder}/spiketrains/labels_test_{data_type}_{fold_num}{suff}.npy")
     
-    spk_inp_val = []
-    spk_inp_train = []
-    
-    for train_spktr in train_spiketrains:
-        spk_train = np.load(train_spktr)
-        spk_inp_train.append(spk_train)
-    for val_spktr in val_spiketrains:
-        spk_val = np.load(val_spktr)
-        spk_inp_val.append(spk_val)
-        
-    spk_inp_train = np.concatenate(spk_inp_train, axis=0)
-    spk_inp_val = np.concatenate(spk_inp_val, axis=0)
     # combine train and val
-    spk_inp_train = np.vstack([spk_inp_train, spk_inp_val])
+    spk_inp_train = np.vstack([train_spiketrains, val_spiketrains])
+    train_val_labels = np.concatenate([train_labels, val_labels])
     
-    train_val_labels = torch.cat([train_labels, val_labels])
-    
-    for test_spktr in test_spiketrains:
-        spk_test = np.load(test_spktr)
-        spk_inp_test = spk_test
-
+    spk_inp_test = test_spiketrains
     n_spikes = np.sum(spk_inp_test)
     total_spikes = np.prod(spk_inp_test.shape)
     sparsity = n_spikes / total_spikes
@@ -247,7 +234,7 @@ def classify_svm(train_labels, val_labels, test_labels, n_spikes_per_timestep, n
     
     classifier_svm.fit(spk_inp_train_avg, train_val_labels, sample_weight=weights)
     test_preds = classifier_svm.predict(spk_inp_test_avg)
-    ts_acc = (test_preds == test_labels.numpy()).mean()*100
+    ts_acc = (test_preds == test_labels).mean()*100
     
     print(f"Test Accuracy: \t\t{ts_acc:.3f}%")
     
@@ -259,7 +246,7 @@ def classify_svm(train_labels, val_labels, test_labels, n_spikes_per_timestep, n
         'val_acc': -1, 
         'test_acc': ts_acc, 
         'test_preds': test_preds, 
-        'test_labels': test_labels.numpy(), 
+        'test_labels': test_labels, 
         'sparsity': sparsity
     }])
     results_file = pd.concat([results_file, results])

@@ -96,32 +96,34 @@ def main(config: dict, input_data: torch.Tensor, target_labels: torch.Tensor, fo
     
     # Get/save the spike-trains
     os.makedirs(f"results/{folder}/spiketrains", exist_ok=True)
-    saved_spiketrains = glob.glob(f"results/{folder}/spiketrains/train_{data_type}_{fold_num}*{suff}.npy")
-    if True: #len(saved_spiketrains) == 0:
-        generate_spiketrains(encoder, train_loader, fold_num, suff, "train")
-        generate_spiketrains(encoder, val_loader, fold_num, suff, "val")
-        generate_spiketrains(encoder, test_loader, fold_num, suff, "test")
+    saved_spiketrains = glob.glob(f"results/{folder}/spiketrains/train_{data_type}_{fold_num}{suff}.npy")
+    if len(saved_spiketrains) == 0:
+        generate_spiketrains(encoder, train_loader, fold_num, suff, "train", data_type)
+        generate_spiketrains(encoder, val_loader, fold_num, suff, "val", data_type)
+        generate_spiketrains(encoder, test_loader, fold_num, suff, "test", data_type)
     else:    
         print("Spiketrains already generated.")
     
     # Initialize the classifier
     if SVM:
-        classify_svm(train_labels, val_labels, test_labels, n_spikes_per_timestep, n_channels, folder, data_type, suff, fold_num, avg_window_sz)
+        classify_svm(n_spikes_per_timestep, n_channels, folder, data_type, suff, fold_num, avg_window_sz)
         
     if SRNN:
         classifier = train_SRNN_classifier(batch_sz, data_type, num_steps, encoder, l1_cls, window_size, stride, device, folder, suff, fold_num, classifier_epochs)
         # classify_srnn()
         
-def generate_spiketrains(encoder, loader, fold_num, suff, split):
+def generate_spiketrains(encoder, loader, fold_num, suff, split, data_type):
     batch_spiketrains = []
     batch_labels = []
     for X, y in loader:
         spk_batch = []
         for window in range(0, X.size(1) - window_size + 1, window_size):
             X_window = X[:, window:window + window_size].to(device)
+            X_window = X_window.nan_to_num_(0)
             
             spiketrain, Z1, Z2 = encoder(X_window)
-            spk_inputs = (spiketrain > theta).type(torch.float).cpu().detach().numpy()
+            spiketrain_cpu = spiketrain.cpu().detach().numpy()
+            spk_inputs = (spiketrain_cpu > theta).astype(np.float32)
             spk_batch.append(spk_inputs)
         
         spk_batch = np.concatenate(spk_batch, axis=1)
@@ -159,11 +161,11 @@ if __name__ == "__main__":
     encoder_epochs = 30
     classifier_epochs = 10
     theta = 0.99 # Threshold parameter for making spiketrains (semi-binary floats to actual ints)
-    l1_sz = 3000 # Size of the first layer in the STL encoder
-    l2_sz = 3000 # Size of the second layer in the STL encoder
+    l1_sz = 0#3000 # Size of the first layer in the STL encoder
+    l2_sz = 0#3000 # Size of the second layer in the STL encoder
     l1_cls = 3000 # Size of the layer in the classifier
     drop_p = 0.0 # Dropout setting
-    encoding_method = "STL" # rate, latency, STL
+    encoding_method = "rate" # rate, latency, STL
     # NOTE: To activate the STL-Stacked, set l1sz (and l2sz) to your liking > 0
     # To use STL-Vanilla, set l1_sz=l2_sz=0.
     avg_window_sz = 100 # For averaging the spiketrains to use as features for the SVM classifier
@@ -181,6 +183,7 @@ if __name__ == "__main__":
     elif encoding_method == "STL" and l1_sz > 0:
         suff = "_STL-S"
     
+    args = []
     for data_type in data_types:
         config = {
             "data_type": data_type,
@@ -215,9 +218,11 @@ if __name__ == "__main__":
         os.makedirs(f"results/{folder}", exist_ok=True)
         os.makedirs(f"imgs/{folder}", exist_ok=True) 
 
-        args = []
         for fold_num, (train_index, test_index) in enumerate(cv.split(input_data, target_labels)):
-            args.append((config, input_data, target_labels, fold_num, train_index, test_index, device, folder))
+            cls = "svm" if SVM else "srnn" if SRNN else "---"
+            if os.path.exists(f"imgs/{folder}/spiketrain_{cls}_{data_type}{suff}_{fold_num}.png"):    
+                print("Skipping fold", fold_num, data_type, suff)
+                continue 
         
             if not os.path.exists(f"results/{folder}/results_{data_type}{suff}.csv"):
                 df = pd.DataFrame(columns=["fold", "train_acc", "val_acc", "test_acc", "test_preds", "test_labels", "sparsity"])
@@ -229,6 +234,7 @@ if __name__ == "__main__":
                     writer = csv.writer(file)
                     writer.writerow(['fold', 'sparsity'])
                 
+            args.append((config, input_data, target_labels, fold_num, train_index, test_index, device, folder))
             # Comment to run all subjects
             # if len(args) == 1:
             #     break

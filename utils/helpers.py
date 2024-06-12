@@ -296,5 +296,59 @@ def classify_svm(n_spikes_per_timestep, n_channels, folder, data_type, suff, fol
 
     return
 
-def classify_srnn():
-    pass
+def classify_srnn(classifier, folder, data_type, fold_num, suff, device, window_size, n_channels, n_spikes_per_timestep):
+    print("Training SRNN...")
+
+    test_spiketrains = np.load(f"results/{folder}/spiketrains/test_{data_type}_{fold_num}{suff}.npy")
+    test_labels = np.load(f"results/{folder}/spiketrains/labels_test_{data_type}_{fold_num}{suff}.npy")
+    
+    spk_inp_test = test_spiketrains
+    n_spikes = np.sum(spk_inp_test)
+    total_spikes = np.prod(spk_inp_test.shape)
+    sparsity = n_spikes / total_spikes
+    print("Sparsity", sparsity)
+    
+    for window in range(0, test_spiketrains.shape[1] - window_size + 1, window_size):
+        spk_inputs = test_spiketrains[:, window:window + window_size].to(device)
+        y = test_labels.to(device)
+        
+        spk, mem = classifier(spk_inputs)
+        _, preds = spk.sum(dim=0).max(1)
+
+    cls_correct_test += (preds == y).sum().item()
+    cls_total_test += y.size(0)
+    cls_acc_test = cls_correct_test / cls_total_test * 100
+    print(f"Test Accuracy: \t\t{cls_acc_test:.3f}%")
+    
+    # Save results
+    results_file = pd.read_csv(f"results/{folder}/results_{data_type}{suff}.csv", index_col=0)
+    results = pd.DataFrame([{
+        'fold': fold_num, 
+        'train_acc': -1, 
+        'val_acc': -1, 
+        'test_acc': cls_acc_test, 
+        'test_preds': preds, 
+        'test_labels': y, 
+        'sparsity': sparsity
+    }])
+    results_file = pd.concat([results_file, results])
+    results_file.to_csv(f"results/{folder}/results_{data_type}{suff}.csv")
+    
+    idx = 0
+    
+    W0 = test_spiketrains[idx]
+    y0 = test_labels[idx]
+    
+    W0_channels = W0.reshape(-1, n_channels, n_spikes_per_timestep)
+    print("Making spiketrain figure...")
+    plt.figure(figsize=(8,6))
+    cs = plt.cm.tab20.colors
+    pixels, channels, spikes = np.where(W0_channels == 1)
+    y_pos = 1 + 0.01 * spikes + n_spikes_per_timestep * 0.01 * channels
+    colors = np.array(cs)[channels]
+    plt.scatter(pixels, y_pos, color=colors, marker='o', s=2)
+    plt.title(f"{data_type.capitalize()} - Fold {fold_num} (y={y0})")
+    plt.savefig(f"imgs/{folder}/spiketrain_svm_{data_type}{suff}_{fold_num}.png")
+    plt.close()
+
+    return

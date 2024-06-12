@@ -14,7 +14,7 @@ from utils.STL import SpikeThresholdLearning
 from utils.RateCoder import RateCoder
 from utils.LatencyCoder import LatencyCoder
 from utils.EncoderLoss import EncoderLoss
-from utils.helpers import train_STL_encoder, train_SRNN_classifier, classify_svm
+from utils.helpers import train_STL_encoder, train_SRNN_classifier, classify_svm, classify_srnn
 from utils.load_data import load_data_emopain
 
 # See __main__ below for config settings.
@@ -96,9 +96,9 @@ def main(config: dict, input_data: torch.Tensor, target_labels: torch.Tensor, fo
     
     # Get/save the spike-trains
     os.makedirs(f"results/{folder}/spiketrains", exist_ok=True)
-    saved_spiketrains = glob.glob(f"results/{folder}/spiketrains/train_{data_type}_{fold_num}{suff}.npy")
+    saved_spiketrains = glob.glob(f"results/{folder}/spiketrains/labels_train_{data_type}_{fold_num}{suff}.npy")
     if len(saved_spiketrains) == 0:
-        print(f"Generating spiketrain...: results/{folder}/spiketrains/train_{data_type}_{fold_num}{suff}.npy")
+        print(f"Generating spiketrain...: results/{folder}/spiketrains/labels_train_{data_type}_{fold_num}{suff}.npy")
         generate_spiketrains(encoder, train_loader, fold_num, suff, "train", data_type)
         generate_spiketrains(encoder, val_loader, fold_num, suff, "val", data_type)
         generate_spiketrains(encoder, test_loader, fold_num, suff, "test", data_type)
@@ -111,7 +111,7 @@ def main(config: dict, input_data: torch.Tensor, target_labels: torch.Tensor, fo
         
     if SRNN:
         classifier = train_SRNN_classifier(batch_sz, data_type, num_steps, encoder, l1_cls, window_size, stride, device, folder, suff, fold_num, classifier_epochs)
-        # classify_srnn()
+        classify_srnn()
         
 def generate_spiketrains(encoder, loader, fold_num, suff, split, data_type):
     batch_spiketrains = []
@@ -153,7 +153,7 @@ if __name__ == "__main__":
     
     device = torch.device("cuda")
 
-    data_types = ["angle"] # ["emg", "energy", "angle"] # emg, energy, angle
+    data_types = ["emg", "energy", "angle"] # emg, energy, angle
     batch_sz = 16
     window_size = 3000
     stride = window_size // 4
@@ -162,18 +162,18 @@ if __name__ == "__main__":
     encoder_epochs = 30
     classifier_epochs = 10
     theta = 0.99 # Threshold parameter for making spiketrains (semi-binary floats to actual ints)
-    l1_sz = 0#3000 # Size of the first layer in the STL encoder
-    l2_sz = 0#3000 # Size of the second layer in the STL encoder
+    l1_sz = 3000 # Size of the first layer in the STL encoder
+    l2_sz = 3000 # Size of the second layer in the STL encoder
     l1_cls = 3000 # Size of the layer in the classifier
     drop_p = 0.0 # Dropout setting
-    encoding_method = "rate" # rate, latency, STL
+    encoding_method = "STL" # rate, latency, STL
     # NOTE: To activate the STL-Stacked, set l1sz (and l2sz) to your liking > 0
     # To use STL-Vanilla, set l1_sz=l2_sz=0.
     avg_window_sz = 100 # For averaging the spiketrains to use as features for the SVM classifier
 
     # Set either one to True
-    SVM = True
-    SRNN = False
+    SVM = False
+    SRNN = True
     
     if encoding_method == "rate":
         suff = "_rate"
@@ -214,7 +214,7 @@ if __name__ == "__main__":
         if SRNN:
             folder = "emopain_srnn"
         elif SVM:
-            folder = "emopain_svm_bsz"
+            folder = "emopain_svm"
             
         os.makedirs(f"results/{folder}", exist_ok=True)
         os.makedirs(f"imgs/{folder}", exist_ok=True) 

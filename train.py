@@ -153,7 +153,7 @@ if __name__ == "__main__":
     
     device = torch.device("cuda")
 
-    data_types = ["emg", "energy", "angle"] # emg, energy, angle
+    data_types = ["angle"] # ["emg", "energy", "angle"] # emg, energy, angle
     batch_sz = 16
     window_size = 3000
     stride = window_size // 4
@@ -162,9 +162,9 @@ if __name__ == "__main__":
     encoder_epochs = 30
     classifier_epochs = 10
     theta = 0.99 # Threshold parameter for making spiketrains (semi-binary floats to actual ints)
-    l1_sz = 0#3000 # Size of the first layer in the STL encoder
-    l2_sz = 0#3000 # Size of the second layer in the STL encoder
-    l1_cls = 1000 # Size of the layer in the classifier
+    l1_sz = 3000 # Size of the first layer in the STL encoder
+    l2_sz = 3000 # Size of the second layer in the STL encoder
+    l1_cls = 3000 # Size of the layer in the classifier
     drop_p = 0.0 # Dropout setting
     encoding_method = "STL" # rate, latency, STL
     # NOTE: To activate the STL-Stacked, set l1sz (and l2sz) to your liking > 0
@@ -214,7 +214,7 @@ if __name__ == "__main__":
         if SRNN:
             folder = "emopain_srnn"
         elif SVM:
-            folder = "emopain_svm"
+            folder = "emopain_svm_bsz"
             
         os.makedirs(f"results/{folder}", exist_ok=True)
         os.makedirs(f"imgs/{folder}", exist_ok=True) 
@@ -232,9 +232,9 @@ if __name__ == "__main__":
                 df.to_csv(f"results/{folder}/results_{data_type}{suff}.csv", index=True)
                 
                 # To save sparsities for each subj
-                with open(f'results/{folder}/spiketrains/sparsities_{data_type}{suff}.csv', mode='w', newline='') as file:
-                    writer = csv.writer(file)
-                    writer.writerow(['fold', 'sparsity'])
+                df = pd.DataFrame(columns=["fold", "sparsity"])
+                df.set_index('fold', inplace=True)
+                df.to_csv(f"results/{folder}/spiketrains/sparsities_{data_type}{suff}.csv", index=True)
                 
             args.append((config, input_data, target_labels, fold_num, train_index, test_index, device, folder))
             # Comment to run all subjects

@@ -85,25 +85,26 @@ def main(config: dict, input_data: torch.Tensor, target_labels: torch.Tensor, fo
     
     print(f"Encoder params: \t{sum(p.numel() for p in encoder.parameters() if p.requires_grad)}")
     
-    # Train the encoder, if method is STL
-    if encoding_method == "STL":
-        encoder = train_STL_encoder(encoder, device,
-                      train_loader, val_loader,
-                      encoder_optimizer, encoder_loss_fn,
-                      encoder_epochs, window_size,
-                      stride, folder, data_type,
-                      fold_num, suff, verbose = True)
-    
     # Get/save the spike-trains
-    os.makedirs(f"results/{folder}/spiketrains", exist_ok=True)
-    saved_spiketrains = glob.glob(f"results/{folder}/spiketrains/labels_train_{data_type}_{fold_num}{suff}.npy")
-    if len(saved_spiketrains) == 0:
+    # NOTE: We now always pick spiketrians from emopain_svm folder, since they don't change.
+    saved_spiketrains = glob.glob(f"results/{folder}/spiketrains/labels_*_{data_type}_{fold_num}{suff}.npy")
+    if len(saved_spiketrains) < 3:
         print(f"Generating spiketrain...: results/{folder}/spiketrains/labels_train_{data_type}_{fold_num}{suff}.npy")
+        
+        # Train the encoder, if method is STL
+        if encoding_method == "STL":
+            encoder = train_STL_encoder(encoder, device,
+                        train_loader, val_loader,
+                        encoder_optimizer, encoder_loss_fn,
+                        encoder_epochs, window_size,
+                        stride, folder, data_type,
+                        fold_num, suff, verbose = True)
+        
         generate_spiketrains(encoder, train_loader, fold_num, suff, "train", data_type)
         generate_spiketrains(encoder, val_loader, fold_num, suff, "val", data_type)
         generate_spiketrains(encoder, test_loader, fold_num, suff, "test", data_type)
     else:    
-        print("Spiketrains already generated: ", f"results/{folder}/spiketrains/train_{data_type}_{fold_num}{suff}.npy")
+        print("Spiketrains already generated: ", f"results/emopain_svm/spiketrains/train_{data_type}_{fold_num}{suff}.npy")
     
     # Initialize the classifier
     if SVM:
@@ -111,7 +112,7 @@ def main(config: dict, input_data: torch.Tensor, target_labels: torch.Tensor, fo
         
     if SRNN:
         classifier = train_SRNN_classifier(batch_sz, data_type, num_steps, encoder, l1_cls, window_size, stride, device, folder, suff, fold_num, classifier_epochs)
-        classify_srnn()
+        classify_srnn(classifier, encoder.output_size, folder, data_type, fold_num, suff, device, window_size, n_channels, n_spikes_per_timestep)
         
 def generate_spiketrains(encoder, loader, fold_num, suff, split, data_type):
     batch_spiketrains = []
@@ -158,13 +159,13 @@ if __name__ == "__main__":
     window_size = 3000
     stride = window_size // 4
     n_spikes_per_timestep = 10 
-    num_steps = 10 # Recurrent steps for the SRNN
+    num_steps = 5 # Recurrent steps for the SRNN
     encoder_epochs = 30
     classifier_epochs = 10
     theta = 0.99 # Threshold parameter for making spiketrains (semi-binary floats to actual ints)
     l1_sz = 3000 # Size of the first layer in the STL encoder
     l2_sz = 3000 # Size of the second layer in the STL encoder
-    l1_cls = 3000 # Size of the layer in the classifier
+    l1_cls = 100 # Size of the layer in the classifier
     drop_p = 0.0 # Dropout setting
     encoding_method = "STL" # rate, latency, STL
     # NOTE: To activate the STL-Stacked, set l1sz (and l2sz) to your liking > 0
@@ -172,8 +173,8 @@ if __name__ == "__main__":
     avg_window_sz = 100 # For averaging the spiketrains to use as features for the SVM classifier
 
     # Set either one to True
-    SVM = False
-    SRNN = True
+    SVM = True
+    SRNN = False
     
     if encoding_method == "rate":
         suff = "_rate"
@@ -214,9 +215,10 @@ if __name__ == "__main__":
         if SRNN:
             folder = "emopain_srnn"
         elif SVM:
-            folder = "emopain_svm"
+            folder = "emopain_svm_fix_MI"
             
         os.makedirs(f"results/{folder}", exist_ok=True)
+        os.makedirs(f"results/{folder}/spiketrains", exist_ok=True)
         os.makedirs(f"imgs/{folder}", exist_ok=True) 
 
         for fold_num, (train_index, test_index) in enumerate(cv.split(input_data, target_labels)):

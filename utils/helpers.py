@@ -208,12 +208,13 @@ def classify_svm(n_spikes_per_timestep, n_channels, folder, data_type, suff, fol
     classifier_svm = SVC(kernel='linear', C=1.0, random_state=1957)
     print("Training SVM...")
 
-    train_spiketrains = np.load(f"results/{folder}/spiketrains/train_{data_type}_{fold_num}{suff}.npy")
-    train_labels = np.load(f"results/{folder}/spiketrains/labels_train_{data_type}_{fold_num}{suff}.npy")
-    val_spiketrains = np.load(f"results/{folder}/spiketrains/val_{data_type}_{fold_num}{suff}.npy")
-    val_labels = np.load(f"results/{folder}/spiketrains/labels_val_{data_type}_{fold_num}{suff}.npy")
-    test_spiketrains = np.load(f"results/{folder}/spiketrains/test_{data_type}_{fold_num}{suff}.npy")
-    test_labels = np.load(f"results/{folder}/spiketrains/labels_test_{data_type}_{fold_num}{suff}.npy")
+    # NOTE: load from emopain_svm.
+    train_spiketrains = np.load(f"results/emopain_svm/spiketrains/train_{data_type}_{fold_num}{suff}.npy")
+    train_labels = np.load(f"results/emopain_svm/spiketrains/labels_train_{data_type}_{fold_num}{suff}.npy")
+    val_spiketrains = np.load(f"results/emopain_svm/spiketrains/val_{data_type}_{fold_num}{suff}.npy")
+    val_labels = np.load(f"results/emopain_svm/spiketrains/labels_val_{data_type}_{fold_num}{suff}.npy")
+    test_spiketrains = np.load(f"results/emopain_svm/spiketrains/test_{data_type}_{fold_num}{suff}.npy")
+    test_labels = np.load(f"results/emopain_svm/spiketrains/labels_test_{data_type}_{fold_num}{suff}.npy")
     
     # combine train and val
     spk_inp_train = np.vstack([train_spiketrains, val_spiketrains])
@@ -296,11 +297,16 @@ def classify_svm(n_spikes_per_timestep, n_channels, folder, data_type, suff, fol
 
     return
 
-def classify_srnn(classifier, folder, data_type, fold_num, suff, device, window_size, n_channels, n_spikes_per_timestep):
+def classify_srnn(classifier, encoder_output_size, folder, data_type, fold_num, suff, device, window_size, n_channels, n_spikes_per_timestep):
     print("Training SRNN...")
+    classifier.to(device)
+    classifier.eval()
 
     test_spiketrains = np.load(f"results/{folder}/spiketrains/test_{data_type}_{fold_num}{suff}.npy")
     test_labels = np.load(f"results/{folder}/spiketrains/labels_test_{data_type}_{fold_num}{suff}.npy")
+    
+    print(test_spiketrains.shape)
+    print(test_labels.shape)
     
     spk_inp_test = test_spiketrains
     n_spikes = np.sum(spk_inp_test)
@@ -308,14 +314,19 @@ def classify_srnn(classifier, folder, data_type, fold_num, suff, device, window_
     sparsity = n_spikes / total_spikes
     print("Sparsity", sparsity)
     
-    for window in range(0, test_spiketrains.shape[1] - window_size + 1, window_size):
-        spk_inputs = test_spiketrains[:, window:window + window_size].to(device)
-        y = test_labels.to(device)
+    test_input = torch.Tensor(test_spiketrains)
+    test_target = torch.Tensor(test_labels)
+    cls_correct_test = 0
+    cls_total_test = 0
+    for window in range(0, test_spiketrains.shape[1] - encoder_output_size + 1, encoder_output_size):
+        spk_inputs = test_input[:, window:window + encoder_output_size].to(device)
+        y = test_target.to(device)
         
         spk, mem = classifier(spk_inputs)
         _, preds = spk.sum(dim=0).max(1)
+        preds = preds.detach().cpu().numpy()
 
-    cls_correct_test += (preds == y).sum().item()
+    cls_correct_test += (preds == test_labels).sum().item()
     cls_total_test += y.size(0)
     cls_acc_test = cls_correct_test / cls_total_test * 100
     print(f"Test Accuracy: \t\t{cls_acc_test:.3f}%")
@@ -328,7 +339,7 @@ def classify_srnn(classifier, folder, data_type, fold_num, suff, device, window_
         'val_acc': -1, 
         'test_acc': cls_acc_test, 
         'test_preds': preds, 
-        'test_labels': y, 
+        'test_labels': test_labels, 
         'sparsity': sparsity
     }])
     results_file = pd.concat([results_file, results])
@@ -348,7 +359,13 @@ def classify_srnn(classifier, folder, data_type, fold_num, suff, device, window_
     colors = np.array(cs)[channels]
     plt.scatter(pixels, y_pos, color=colors, marker='o', s=2)
     plt.title(f"{data_type.capitalize()} - Fold {fold_num} (y={y0})")
-    plt.savefig(f"imgs/{folder}/spiketrain_svm_{data_type}{suff}_{fold_num}.png")
+    plt.savefig(f"imgs/{folder}/spiketrain_srnn_{data_type}{suff}_{fold_num}.png")
     plt.close()
-
+    
+    # Delete cuda variables
+    classifier.cpu()
+    test_target.cpu()
+    test_input.cpu()
+    torch.cuda.empty_cache()
+    
     return

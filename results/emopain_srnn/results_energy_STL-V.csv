@@ -1,1 +1,2 @@
-fold,train_acc,val_acc,test_acc,test_preds,test_labels,sparsity
+,train_acc,val_acc,test_acc,test_preds,test_labels,sparsity,fold
+0,-1,-1,100.0,[0],[0],0.41406055555555554,0.0

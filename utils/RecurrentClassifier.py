@@ -11,8 +11,10 @@ class RecurrentClassifier(torch.nn.Module):
         
         self.fc1 = torch.nn.Linear(encoder_output_size, l1_sz)
         self.rlif1 = snn.RLeaky(beta=lif_beta, linear_features=l1_sz) #, learn_beta=True, learn_recurrent=True)
+        # self.rlif1 = snn.RLeaky(beta=lif_beta, all_to_all=False) #, learn_beta=True, learn_recurrent=True)
         self.fc2 = torch.nn.Linear(l1_sz, n_classes)
         self.rlif2 = snn.RLeaky(beta=lif_beta, linear_features=n_classes, V=1) #, learn_beta=True, learn_recurrent=True)
+        # self.rlif2 = snn.RLeaky(beta=lif_beta, all_to_all=False) #, learn_beta=True, learn_recurrent=True)
         
     def forward(self, x):
         # At timestep 0, initalize spk1 and mem1

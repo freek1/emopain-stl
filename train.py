@@ -40,6 +40,13 @@ def main(config: dict, input_data: torch.Tensor, target_labels: torch.Tensor, fo
     SRNN = config["SRNN"]
     
     print(f"FOLDER = '{folder} {encoding_method} {data_type}{suff}'")
+    
+    # Load results file to check if the current run was done already
+    results_file = f"results/{folder}/results_{data_type}{suff}.csv"
+    results = pd.read_csv(results_file)
+    if fold_num in results.index or fold_num in results["fold"]:
+        print(f"Found current run in folder '{results_file}'! Skipping...")
+        return
 
     # Split into test, val and train
     test_data, test_labels = input_data[test_index], target_labels[test_index]
@@ -104,7 +111,7 @@ def main(config: dict, input_data: torch.Tensor, target_labels: torch.Tensor, fo
         generate_spiketrains(encoder, val_loader, fold_num, suff, "val", data_type)
         generate_spiketrains(encoder, test_loader, fold_num, suff, "test", data_type)
     else:    
-        print("Spiketrains already generated: ", f"results/emopain_svm/spiketrains/train_{data_type}_{fold_num}{suff}.npy")
+        print("Spiketrains already generated: ", f"results/{folder}/spiketrains/train_{data_type}_{fold_num}{suff}.npy")
     
     # Initialize the classifier
     if SVM:
@@ -157,9 +164,9 @@ if __name__ == "__main__":
     data_types = ["emg", "energy", "angle"] # emg, energy, angle
     batch_sz = 16
     window_size = 3000
-    stride = window_size // 4
+    stride = window_size // 4 # 75% overlap
     n_spikes_per_timestep = 10 
-    num_steps = 5 # Recurrent steps for the SRNN
+    num_steps = 10 # Recurrent steps for the SRNN
     encoder_epochs = 30
     classifier_epochs = 10
     theta = 0.99 # Threshold parameter for making spiketrains (semi-binary floats to actual ints)
@@ -173,8 +180,8 @@ if __name__ == "__main__":
     avg_window_sz = 100 # For averaging the spiketrains to use as features for the SVM classifier
 
     # Set either one to True
-    SVM = True
-    SRNN = False
+    SVM = False
+    SRNN = True
     
     if encoding_method == "rate":
         suff = "_rate"
@@ -215,7 +222,7 @@ if __name__ == "__main__":
         if SRNN:
             folder = "emopain_srnn"
         elif SVM:
-            folder = "emopain_svm_fix_MI"
+            folder = "emopain_svm"
             
         os.makedirs(f"results/{folder}", exist_ok=True)
         os.makedirs(f"results/{folder}/spiketrains", exist_ok=True)
@@ -245,7 +252,7 @@ if __name__ == "__main__":
     
     print(f"Starting {len(args)} runs...")
     start = time.time()
-    for arg in args:
+    for arg in args[::-1]:
         main(*arg)
     end = time.time()
     print(f"{len(args)} runs took {(end-start)/60:.2f} minutes.")

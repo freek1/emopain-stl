@@ -9,12 +9,13 @@ import pandas as pd
 import os
 import time
 import glob
+import json
 
 from utils.STL import SpikeThresholdLearning
 from utils.RateCoder import RateCoder
 from utils.LatencyCoder import LatencyCoder
 from utils.EncoderLoss import EncoderLoss
-from utils.helpers import train_STL_encoder, train_SRNN_classifier, classify_svm, classify_srnn
+from utils.helpers import train_STL_encoder, train_SRNN_classifier, train_SRNN_classifier_nowindow, classify_svm, classify_srnn, classify_srnn_nowindow
 from utils.load_data import load_data_emopain
 
 # See __main__ below for config settings.
@@ -32,6 +33,7 @@ def main(config: dict, input_data: torch.Tensor, target_labels: torch.Tensor, fo
     l1_sz = config["l1_sz"]
     l2_sz = config["l2_sz"]
     l1_cls = config["l1_cls"]
+    l2_cls = config["l2_cls"]
     drop_p = config["drop_p"]
     encoding_method = config["encoding_method"]
     avg_window_sz = config["avg_window_sz"]
@@ -118,8 +120,8 @@ def main(config: dict, input_data: torch.Tensor, target_labels: torch.Tensor, fo
         classify_svm(n_spikes_per_timestep, n_channels, folder, data_type, suff, fold_num, avg_window_sz)
         
     if SRNN:
-        classifier = train_SRNN_classifier(batch_sz, data_type, num_steps, encoder, l1_cls, window_size, stride, device, folder, suff, fold_num, classifier_epochs)
-        classify_srnn(classifier, encoder.output_size, folder, data_type, fold_num, suff, device, window_size, n_channels, n_spikes_per_timestep)
+        classifier = train_SRNN_classifier_nowindow(batch_sz, data_type, num_steps, encoder, l1_cls, l2_cls, window_size, stride, device, folder, suff, fold_num, classifier_epochs)
+        classify_srnn_nowindow(classifier, encoder.output_size, folder, data_type, fold_num, suff, device, window_size, n_channels, n_spikes_per_timestep)
         
 def generate_spiketrains(encoder, loader, fold_num, suff, split, data_type):
     batch_spiketrains = []
@@ -170,11 +172,12 @@ if __name__ == "__main__":
     encoder_epochs = 30
     classifier_epochs = 10
     theta = 0.99 # Threshold parameter for making spiketrains (semi-binary floats to actual ints)
-    l1_sz = 3000 # Size of the first layer in the STL encoder
-    l2_sz = 3000 # Size of the second layer in the STL encoder
-    l1_cls = 100 # Size of the layer in the classifier
+    l1_sz = 0#3000 # Size of the first layer in the STL encoder
+    l2_sz = 0#3000 # Size of the second layer in the STL encoder
+    l1_cls = 1000 # Size of the layer in the classifier
+    l2_cls = 1000
     drop_p = 0.0 # Dropout setting
-    encoding_method = "STL" # rate, latency, STL
+    encoding_method = "rate" # rate, latency, STL
     # NOTE: To activate the STL-Stacked, set l1sz (and l2sz) to your liking > 0
     # To use STL-Vanilla, set l1_sz=l2_sz=0.
     avg_window_sz = 100 # For averaging the spiketrains to use as features for the SVM classifier
@@ -194,6 +197,14 @@ if __name__ == "__main__":
     
     args = []
     for data_type in data_types:
+        # Batch size findings from search
+        if data_type == "emg":
+            batch_sz = 64
+        elif data_type == "energy":
+            batch_sz = 64
+        elif data_type == "angle":
+            batch_sz = 16
+        
         config = {
             "data_type": data_type,
             "batch_sz": batch_sz,
@@ -207,6 +218,7 @@ if __name__ == "__main__":
             "l1_sz": l1_sz,
             "l2_sz": l2_sz,
             "l1_cls": l1_cls,
+            "l2_cls": l2_cls,
             "drop_p": drop_p,
             "encoding_method": encoding_method,
             "avg_window_sz": avg_window_sz,
@@ -220,7 +232,7 @@ if __name__ == "__main__":
         print(f"{data_type.capitalize()} data loaded:", input_data.shape, target_labels.shape)
         
         if SRNN:
-            folder = "emopain_srnn"
+            folder = "emopain_srnn_bsz"
         elif SVM:
             folder = "emopain_svm"
             
@@ -249,10 +261,14 @@ if __name__ == "__main__":
             # Comment to run all subjects
             # if len(args) == 1:
             #     break
+            
+            # save config as json
+            with open(f"results/{folder}/config_{data_type}.json", "w") as f:
+                json.dump(config, f)
     
     print(f"Starting {len(args)} runs...")
     start = time.time()
-    for arg in args[::-1]:
+    for arg in args:
         main(*arg)
     end = time.time()
     print(f"{len(args)} runs took {(end-start)/60:.2f} minutes.")

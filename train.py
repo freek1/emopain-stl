@@ -42,11 +42,11 @@ def main(config: dict, input_data: torch.Tensor, target_labels: torch.Tensor, fo
     print(f"FOLDER = '{folder} {encoding_method} {data_type}{suff}'")
     
     # Load results file to check if the current run was done already
-    results_file = f"results/{folder}/results_{data_type}{suff}.csv"
-    results = pd.read_csv(results_file)
-    if fold_num in results.index or fold_num in results["fold"]:
-        print(f"Found current run in folder '{results_file}'! Skipping...")
-        return
+    # results_file = f"results/{folder}/results_{data_type}{suff}.csv"
+    # results = pd.read_csv(results_file)
+    # if fold_num in results.index or fold_num in results["fold"]:
+    #     print(f"Found current run in folder '{results_file}'! Skipping...")
+    #     return
 
     # Split into test, val and train
     test_data, test_labels = input_data[test_index], target_labels[test_index]

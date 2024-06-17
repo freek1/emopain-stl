@@ -164,20 +164,20 @@ if __name__ == "__main__":
     device = torch.device("cuda")
 
     data_types = ["emg", "energy", "angle"] # emg, energy, angle
-    batch_sz = 16
+    batch_sz = 16 # Gets overridden later for specific data_type
     window_size = 3000
     stride = window_size // 4 # 75% overlap
-    n_spikes_per_timestep = 10 
+    n_spikes_per_timestep = 15
     num_steps = 10 # Recurrent steps for the SRNN
     encoder_epochs = 30
     classifier_epochs = 10
     theta = 0.99 # Threshold parameter for making spiketrains (semi-binary floats to actual ints)
-    l1_sz = 0#3000 # Size of the first layer in the STL encoder
-    l2_sz = 0#3000 # Size of the second layer in the STL encoder
-    l1_cls = 1000 # Size of the layer in the classifier
-    l2_cls = 1000
+    l1_sz = 3000 # Size of the first layer in the STL encoder
+    l2_sz = 3000 # Size of the second layer in the STL encoder
+    l1_cls = 100 # Size of the layer in the classifier
+    l2_cls = 100
     drop_p = 0.0 # Dropout setting
-    encoding_method = "rate" # rate, latency, STL
+    encoding_method = "STL" # rate, latency, STL
     # NOTE: To activate the STL-Stacked, set l1sz (and l2sz) to your liking > 0
     # To use STL-Vanilla, set l1_sz=l2_sz=0.
     avg_window_sz = 100 # For averaging the spiketrains to use as features for the SVM classifier
@@ -199,9 +199,9 @@ if __name__ == "__main__":
     for data_type in data_types:
         # Batch size findings from search
         if data_type == "emg":
-            batch_sz = 64
+            batch_sz = 32
         elif data_type == "energy":
-            batch_sz = 64
+            batch_sz = 32
         elif data_type == "angle":
             batch_sz = 16
         

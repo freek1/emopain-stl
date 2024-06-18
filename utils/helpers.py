@@ -315,12 +315,18 @@ def classify_svm(n_spikes_per_timestep, n_channels, folder, data_type, suff, fol
     print("Training SVM...")
 
     # NOTE: load from emopain_svm.
-    train_spiketrains = np.load(f"results/emopain_svm/spiketrains/train_{data_type}_{fold_num}{suff}.npy")
-    train_labels = np.load(f"results/emopain_svm/spiketrains/labels_train_{data_type}_{fold_num}{suff}.npy")
-    val_spiketrains = np.load(f"results/emopain_svm/spiketrains/val_{data_type}_{fold_num}{suff}.npy")
-    val_labels = np.load(f"results/emopain_svm/spiketrains/labels_val_{data_type}_{fold_num}{suff}.npy")
-    test_spiketrains = np.load(f"results/emopain_svm/spiketrains/test_{data_type}_{fold_num}{suff}.npy")
-    test_labels = np.load(f"results/emopain_svm/spiketrains/labels_test_{data_type}_{fold_num}{suff}.npy")
+    # train_spiketrains = np.load(f"results/emopain_svm/spiketrains/train_{data_type}_{fold_num}{suff}.npy")
+    # train_labels = np.load(f"results/emopain_svm/spiketrains/labels_train_{data_type}_{fold_num}{suff}.npy")
+    # val_spiketrains = np.load(f"results/emopain_svm/spiketrains/val_{data_type}_{fold_num}{suff}.npy")
+    # val_labels = np.load(f"results/emopain_svm/spiketrains/labels_val_{data_type}_{fold_num}{suff}.npy")
+    # test_spiketrains = np.load(f"results/emopain_svm/spiketrains/test_{data_type}_{fold_num}{suff}.npy")
+    # test_labels = np.load(f"results/emopain_svm/spiketrains/labels_test_{data_type}_{fold_num}{suff}.npy")
+    train_spiketrains = np.load(f"results/{folder}/spiketrains/train_{data_type}_{fold_num}{suff}.npy")
+    train_labels = np.load(f"results/{folder}/spiketrains/labels_train_{data_type}_{fold_num}{suff}.npy")
+    val_spiketrains = np.load(f"results/{folder}/spiketrains/val_{data_type}_{fold_num}{suff}.npy")
+    val_labels = np.load(f"results/{folder}/spiketrains/labels_val_{data_type}_{fold_num}{suff}.npy")
+    test_spiketrains = np.load(f"results/{folder}/spiketrains/test_{data_type}_{fold_num}{suff}.npy")
+    test_labels = np.load(f"results/{folder}/spiketrains/labels_test_{data_type}_{fold_num}{suff}.npy")
     
     # combine train and val
     spk_inp_train = np.vstack([train_spiketrains, val_spiketrains])

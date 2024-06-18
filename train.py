@@ -97,6 +97,7 @@ def main(config: dict, input_data: torch.Tensor, target_labels: torch.Tensor, fo
     # Get/save the spike-trains
     # NOTE: We now always pick spiketrians from emopain_svm folder, since they don't change.
     saved_spiketrains = glob.glob(f"results/{folder}/spiketrains/labels_*_{data_type}_{fold_num}{suff}.npy")
+    # saved_spiketrains = glob.glob(f"results/emopain_svm/spiketrains/labels_*_{data_type}_{fold_num}{suff}.npy")
     if len(saved_spiketrains) < 3:
         print(f"Generating spiketrain...: results/{folder}/spiketrains/labels_train_{data_type}_{fold_num}{suff}.npy")
         
@@ -114,6 +115,7 @@ def main(config: dict, input_data: torch.Tensor, target_labels: torch.Tensor, fo
         generate_spiketrains(encoder, test_loader, fold_num, theta, suff, "test", data_type)
     else:    
         print("Spiketrains already generated: ", f"results/{folder}/spiketrains/train_{data_type}_{fold_num}{suff}.npy")
+        # print("Spiketrains already generated: ", f"results/emopain_svm/spiketrains/train_{data_type}_{fold_num}{suff}.npy")
     
     # Initialize the classifier
     if SVM:
@@ -167,15 +169,15 @@ if __name__ == "__main__":
     batch_sz = 16 # Gets overridden later for specific data_type
     window_size = 3000
     stride = window_size // 4 # 75% overlap
-    n_spikes_per_timestep = 10
+    n_spikes_per_timestep = 15
     num_steps = 15 # Recurrent steps for the SRNN
     encoder_epochs = 30
-    classifier_epochs = 15
+    classifier_epochs = 25
     theta = 0.99 # Threshold parameter for making spiketrains (semi-binary floats to actual ints)
     l1_sz = 0#3000 # Size of the first layer in the STL encoder
     l2_sz = 0#3000 # Size of the second layer in the STL encoder
-    l1_cls = 100 # Size of the layer in the classifier
-    l2_cls = 100
+    l1_cls = 1000 # Size of the layer in the classifier
+    l2_cls = 0 # Set to 0 to ignore
     drop_p = 0.0 # Dropout setting
     encoding_method = "STL" # rate, latency, STL
     # NOTE: To activate the STL-Stacked, set l1sz (and l2sz) to your liking > 0
@@ -183,8 +185,8 @@ if __name__ == "__main__":
     avg_window_sz = 100 # For averaging the spiketrains to use as features for the SVM classifier
 
     # Set either one to True
-    SVM = False
-    SRNN = True
+    SVM = True
+    SRNN = False
     
     if encoding_method == "rate":
         suff = "_rate"
@@ -232,9 +234,9 @@ if __name__ == "__main__":
         print(f"{data_type.capitalize()} data loaded:", input_data.shape, target_labels.shape)
         
         if SRNN:
-            folder = "emopain_srnn_bsz_2"
+            folder = f"emopain_srnn_bsz_{n_spikes_per_timestep}sp"
         elif SVM:
-            folder = "emopain_svm"
+            folder = f"emopain_svm_{n_spikes_per_timestep}sp"
             
         os.makedirs(f"results/{folder}", exist_ok=True)
         os.makedirs(f"results/{folder}/spiketrains", exist_ok=True)

@@ -179,7 +179,7 @@ if __name__ == "__main__":
     l1_cls = 1000 # Size of the layer in the classifier
     l2_cls = 0 # Set to 0 to ignore
     drop_p = 0.0 # Dropout setting
-    encoding_method = "rate" # rate, latency, STL
+    encoding_method = "latency" # rate, latency, STL
     # NOTE: To activate the STL-Stacked, set l1sz (and l2sz) to your liking > 0
     # To use STL-Vanilla, set l1_sz=l2_sz=0.
     avg_window_sz = 100 # For averaging the spiketrains to use as features for the SVM classifier
@@ -270,10 +270,10 @@ if __name__ == "__main__":
     
     print(f"Starting {len(args)} runs...")
     start = time.time()
-    for arg in args:
-        main(*arg)
-    # with mp.Pool(4) as p:
-    #     p.starmap(main, args)
+    # for arg in args:
+    #     main(*arg)
+    with mp.Pool(16) as p:
+        p.starmap(main, args)
     
     end = time.time()
     print(f"{len(args)} runs took {(end-start)/60:.2f} minutes.")

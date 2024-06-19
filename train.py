@@ -270,10 +270,10 @@ if __name__ == "__main__":
     
     print(f"Starting {len(args)} runs...")
     start = time.time()
-    # for arg in args:
-    #     main(*arg)
-    with mp.Pool(16) as p:
-        p.starmap(main, args)
+    for arg in args:
+        main(*arg)
+    # with mp.Pool(16) as p:
+    #     p.starmap(main, args)
     
     end = time.time()
     print(f"{len(args)} runs took {(end-start)/60:.2f} minutes.")

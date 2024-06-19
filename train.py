@@ -110,9 +110,9 @@ def main(config: dict, input_data: torch.Tensor, target_labels: torch.Tensor, fo
                         stride, folder, data_type,
                         fold_num, suff, verbose = True)
         
-        generate_spiketrains(encoder, train_loader, fold_num, theta, suff, "train", data_type)
-        generate_spiketrains(encoder, val_loader, fold_num, theta, suff, "val", data_type)
-        generate_spiketrains(encoder, test_loader, fold_num, theta, suff, "test", data_type)
+        generate_spiketrains(encoder, train_loader, fold_num, theta, suff, "train", data_type, window_size, device, folder)
+        generate_spiketrains(encoder, val_loader, fold_num, theta, suff, "val", data_type, window_size, device, folder)
+        generate_spiketrains(encoder, test_loader, fold_num, theta, suff, "test", data_type, window_size, device, folder)
     else:    
         print("Spiketrains already generated: ", f"results/{folder}/spiketrains/train_{data_type}_{fold_num}{suff}.npy")
         # print("Spiketrains already generated: ", f"results/emopain_svm/spiketrains/train_{data_type}_{fold_num}{suff}.npy")
@@ -125,7 +125,7 @@ def main(config: dict, input_data: torch.Tensor, target_labels: torch.Tensor, fo
         classifier = train_SRNN_classifier_nowindow(batch_sz, data_type, num_steps, encoder, l1_cls, l2_cls, window_size, stride, device, folder, suff, fold_num, classifier_epochs)
         classify_srnn_nowindow(classifier, encoder.output_size, folder, data_type, fold_num, suff, device, window_size, n_channels, n_spikes_per_timestep)
         
-def generate_spiketrains(encoder, loader, fold_num, theta, suff, split, data_type):
+def generate_spiketrains(encoder, loader, fold_num, theta, suff, split, data_type, window_size, device, folder):
     batch_spiketrains = []
     batch_labels = []
     for X, y in loader:
@@ -169,13 +169,13 @@ if __name__ == "__main__":
     batch_sz = 16 # Gets overridden later for specific data_type
     window_size = 3000
     stride = window_size // 4 # 75% overlap
-    n_spikes_per_timestep = 15
+    n_spikes_per_timestep = 5
     num_steps = 15 # Recurrent steps for the SRNN
     encoder_epochs = 30
     classifier_epochs = 25
     theta = 0.99 # Threshold parameter for making spiketrains (semi-binary floats to actual ints)
-    l1_sz = 0#3000 # Size of the first layer in the STL encoder
-    l2_sz = 0#3000 # Size of the second layer in the STL encoder
+    l1_sz = 3000 # Size of the first layer in the STL encoder
+    l2_sz = 3000 # Size of the second layer in the STL encoder
     l1_cls = 1000 # Size of the layer in the classifier
     l2_cls = 0 # Set to 0 to ignore
     drop_p = 0.0 # Dropout setting
@@ -200,12 +200,12 @@ if __name__ == "__main__":
     args = []
     for data_type in data_types:
         # Batch size findings from search
-        if data_type == "emg":
-            batch_sz = 32
-        elif data_type == "energy":
-            batch_sz = 8
-        elif data_type == "angle":
-            batch_sz = 16
+        # if data_type == "emg":
+        #     batch_sz = 32
+        # elif data_type == "energy":
+        #     batch_sz = 8
+        # elif data_type == "angle":
+        #     batch_sz = 16
         
         config = {
             "data_type": data_type,
@@ -236,7 +236,7 @@ if __name__ == "__main__":
         if SRNN:
             folder = f"emopain_srnn_bsz_{n_spikes_per_timestep}sp"
         elif SVM:
-            folder = f"emopain_svm_{n_spikes_per_timestep}sp"
+            folder = f"emopain_svm_{n_spikes_per_timestep}sp_mi"
             
         os.makedirs(f"results/{folder}", exist_ok=True)
         os.makedirs(f"results/{folder}/spiketrains", exist_ok=True)
@@ -270,7 +270,10 @@ if __name__ == "__main__":
     
     print(f"Starting {len(args)} runs...")
     start = time.time()
-    for arg in args:
-        main(*arg)
+    # for arg in args:
+    #     main(*arg)
+    with mp.Pool(4) as p:
+        p.starmap(main, args)
+    
     end = time.time()
     print(f"{len(args)} runs took {(end-start)/60:.2f} minutes.")

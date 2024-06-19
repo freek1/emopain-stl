@@ -85,5 +85,6 @@ def compute_mutual_information(X, Z):
         px = torch.max(px, eps)
         pz = torch.max(pz, eps)
         
-    mutual_information = joint_prob * torch.log2((joint_prob) / (px * pz))
+    # mutual_information = joint_prob * torch.log2((joint_prob) / (px * pz))
+    mutual_information = joint_prob * torch.log2((joint_prob) / px * pz)
     return mutual_information

@@ -166,20 +166,20 @@ if __name__ == "__main__":
     device = torch.device("cuda")
 
     data_types = ["emg", "energy", "angle"] # emg, energy, angle
-    batch_sz = 16 # Gets overridden later for specific data_type
+    batch_sz = 46 # Gets overridden later for specific data_type
     window_size = 3000
     stride = window_size // 4 # 75% overlap
-    n_spikes_per_timestep = 5
+    n_spikes_per_timestep = 15
     num_steps = 15 # Recurrent steps for the SRNN
     encoder_epochs = 30
     classifier_epochs = 25
     theta = 0.99 # Threshold parameter for making spiketrains (semi-binary floats to actual ints)
-    l1_sz = 0#3000 # Size of the first layer in the STL encoder
-    l2_sz = 0#3000 # Size of the second layer in the STL encoder
+    l1_sz = 3000 # Size of the first layer in the STL encoder
+    l2_sz = 3000 # Size of the second layer in the STL encoder
     l1_cls = 1000 # Size of the layer in the classifier
     l2_cls = 0 # Set to 0 to ignore
     drop_p = 0.0 # Dropout setting
-    encoding_method = "latency" # rate, latency, STL
+    encoding_method = "STL" # rate, latency, STL
     # NOTE: To activate the STL-Stacked, set l1sz (and l2sz) to your liking > 0
     # To use STL-Vanilla, set l1_sz=l2_sz=0.
     avg_window_sz = 100 # For averaging the spiketrains to use as features for the SVM classifier
@@ -236,7 +236,7 @@ if __name__ == "__main__":
         if SRNN:
             folder = f"emopain_srnn_bsz_{n_spikes_per_timestep}sp"
         elif SVM:
-            folder = f"emopain_svm_{n_spikes_per_timestep}sp_mi"
+            folder = f"fixmi/emopain_svm_{n_spikes_per_timestep}sp"
             
         os.makedirs(f"results/{folder}", exist_ok=True)
         os.makedirs(f"results/{folder}/spiketrains", exist_ok=True)

@@ -169,7 +169,7 @@ if __name__ == "__main__":
     batch_sz = 46 # Gets overridden later for specific data_type
     window_size = 3000
     stride = window_size // 4 # 75% overlap
-    n_spikes_per_timestep = 15
+    n_spikes_per_timestep = 2
     num_steps = 15 # Recurrent steps for the SRNN
     encoder_epochs = 30
     classifier_epochs = 25
@@ -181,7 +181,7 @@ if __name__ == "__main__":
     drop_p = 0.0 # Dropout setting
     encoding_method = "STL" # rate, latency, STL
     # NOTE: To activate the STL-Stacked, set l1sz (and l2sz) to your liking > 0
-    # To use STL-Vanilla, set l1_sz=l2_sz=0.
+    #       To use STL-Vanilla, set l1_sz=l2_sz=0.
     avg_window_sz = 100 # For averaging the spiketrains to use as features for the SVM classifier
 
     # Set either one to True

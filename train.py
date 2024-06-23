@@ -169,13 +169,13 @@ if __name__ == "__main__":
     batch_sz = 46 # Gets overridden later for specific data_type
     window_size = 3000
     stride = window_size // 4 # 75% overlap
-    n_spikes_per_timestep = 10
+    n_spikes_per_timestep = 5
     num_steps = 15 # Recurrent steps for the SRNN
     encoder_epochs = 30
     classifier_epochs = 25
     theta = 0.99 # Threshold parameter for making spiketrains (semi-binary floats to actual ints)
-    l1_sz = 3000 # Size of the first layer in the STL encoder
-    l2_sz = 3000 # Size of the second layer in the STL encoder
+    l1_sz = 0#3000 # Size of the first layer in the STL encoder
+    l2_sz = 0#3000 # Size of the second layer in the STL encoder
     l1_cls = 1000 # Size of the layer in the classifier
     l2_cls = 0 # Set to 0 to ignore
     drop_p = 0.5 # Dropout setting
@@ -202,10 +202,12 @@ if __name__ == "__main__":
         # Batch size findings from search
         if data_type == "emg":
             batch_sz = 32
-        elif data_type == "energy":
+        if data_type == "energy":
             batch_sz = 8
-        elif data_type == "angle":
+        if data_type == "angle":
             batch_sz = 16
+        # if n_spikes_per_timestep == 10:
+        #     batch_sz = 1
         
         config = {
             "data_type": data_type,

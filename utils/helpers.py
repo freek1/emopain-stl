@@ -269,11 +269,11 @@ def train_SRNN_classifier_nowindow(batch_sz, data_type, num_steps, encoder, l1_c
         if epoch_val_loss < lowest_cls_val_loss:
             lowest_cls_val_loss = epoch_val_loss
             best_classifier = classifier.state_dict()
-            torch.save(best_classifier, f"results/{folder}/best_classifier_{data_type}{suff}.pth")
+            # torch.save(best_classifier, f"results/{folder}/best_classifier_{data_type}{suff}.pth")
     
     save_cls_loss_plot(cls_loss, cls_loss_val, folder, suff, data_type, fold_num)
     
-    classifier.load_state_dict(torch.load(f"results/{folder}/best_classifier_{data_type}{suff}.pth"))
+    classifier.load_state_dict(best_classifier)
     classifier.eval()
     
     # Remove cuda variables

@@ -199,7 +199,7 @@ def train_SRNN_classifier_nowindow(batch_sz, data_type, num_steps, encoder, l1_c
     print(f"Classifier params: \t{sum(p.numel() for p in classifier.parameters() if p.requires_grad)}")
     
     classifier.to(device)
-    classifier_optimizer = torch.optim.AdamW(classifier.parameters(), lr=0.0005)
+    classifier_optimizer = torch.optim.AdamW(classifier.parameters(), lr=0.00075)
     loss_fn = torch.nn.CrossEntropyLoss()
     
     train_spiketrains = torch.Tensor(train_spiketrains)

@@ -169,7 +169,7 @@ if __name__ == "__main__":
     batch_sz = 46 # Gets overridden later for specific data_type
     window_size = 3000
     stride = window_size // 4 # 75% overlap
-    n_spikes_per_timestep = 2
+    n_spikes_per_timestep = 10
     num_steps = 15 # Recurrent steps for the SRNN
     encoder_epochs = 30
     classifier_epochs = 25
@@ -178,15 +178,15 @@ if __name__ == "__main__":
     l2_sz = 3000 # Size of the second layer in the STL encoder
     l1_cls = 1000 # Size of the layer in the classifier
     l2_cls = 0 # Set to 0 to ignore
-    drop_p = 0.0 # Dropout setting
+    drop_p = 0.5 # Dropout setting
     encoding_method = "STL" # rate, latency, STL
     # NOTE: To activate the STL-Stacked, set l1sz (and l2sz) to your liking > 0
     #       To use STL-Vanilla, set l1_sz=l2_sz=0.
     avg_window_sz = 100 # For averaging the spiketrains to use as features for the SVM classifier
 
     # Set either one to True
-    SVM = True
-    SRNN = False
+    SVM = False
+    SRNN = True
     
     if encoding_method == "rate":
         suff = "_rate"
@@ -200,12 +200,12 @@ if __name__ == "__main__":
     args = []
     for data_type in data_types:
         # Batch size findings from search
-        # if data_type == "emg":
-        #     batch_sz = 32
-        # elif data_type == "energy":
-        #     batch_sz = 8
-        # elif data_type == "angle":
-        #     batch_sz = 16
+        if data_type == "emg":
+            batch_sz = 32
+        elif data_type == "energy":
+            batch_sz = 8
+        elif data_type == "angle":
+            batch_sz = 16
         
         config = {
             "data_type": data_type,
@@ -234,7 +234,7 @@ if __name__ == "__main__":
         print(f"{data_type.capitalize()} data loaded:", input_data.shape, target_labels.shape)
         
         if SRNN:
-            folder = f"emopain_srnn_bsz_{n_spikes_per_timestep}sp"
+            folder = f"fixmi/emopain_srnn_{n_spikes_per_timestep}sp_{drop_p}dp"
         elif SVM:
             folder = f"fixmi/emopain_svm_{n_spikes_per_timestep}sp"
             

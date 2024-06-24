@@ -554,7 +554,8 @@ def classify_srnn_nowindow(classifier, encoder_output_size, folder, data_type, f
     plt.close()
     
     # Delete cuda variables
-    classifier.cpu()
+    # classifier.cpu()
+    del classifier
     test_target.cpu()
     test_input.cpu()
     torch.cuda.empty_cache()

@@ -174,8 +174,8 @@ if __name__ == "__main__":
     encoder_epochs = 30
     classifier_epochs = 25
     theta = 0.99 # Threshold parameter for making spiketrains (semi-binary floats to actual ints)
-    l1_sz = 3000 # Size of the first layer in the STL encoder
-    l2_sz = 3000 # Size of the second layer in the STL encoder
+    l1_sz = 0#3000 # Size of the first layer in the STL encoder
+    l2_sz = 0#3000 # Size of the second layer in the STL encoder
     l1_cls = 1000 # Size of the layer in the classifier
     l2_cls = 0 # Set to 0 to ignore
     drop_p = 0.5 # Dropout setting
@@ -248,9 +248,9 @@ if __name__ == "__main__":
         for fold_num, (train_index, test_index) in enumerate(cv.split(input_data, target_labels)):
             cls = "svm" if SVM else "srnn" if SRNN else "---"
             # Check if the spiketrain image is generated, if so, no need to compute whole fold again. 
-            # if os.path.exists(f"imgs/{folder}/spiketrain_{cls}_{data_type}{suff}_{fold_num}.png"):    
-            #     print("Skipping fold", fold_num, data_type, suff)
-            #     continue 
+            if os.path.exists(f"imgs/{folder}/spiketrain_{cls}_{data_type}{suff}_{fold_num}.png"):    
+                print("Skipping fold", fold_num, data_type, suff)
+                continue 
         
             if not os.path.exists(f"results/{folder}/results_{data_type}{suff}.csv"):
                 df = pd.DataFrame(columns=["fold", "train_acc", "val_acc", "test_acc", "test_preds", "test_labels", "sparsity"])

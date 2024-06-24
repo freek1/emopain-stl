@@ -169,7 +169,7 @@ if __name__ == "__main__":
     batch_sz = 46 # Gets overridden later for specific data_type
     window_size = 3000
     stride = window_size // 4 # 75% overlap
-    n_spikes_per_timestep = 5
+    n_spikes_per_timestep = 10
     num_steps = 15 # Recurrent steps for the SRNN
     encoder_epochs = 30
     classifier_epochs = 25
@@ -206,8 +206,8 @@ if __name__ == "__main__":
             batch_sz = 8
         if data_type == "angle":
             batch_sz = 16
-        # if n_spikes_per_timestep == 10:
-        #     batch_sz = 1
+        if n_spikes_per_timestep == 10:
+            batch_sz = batch_sz // 2
         
         config = {
             "data_type": data_type,

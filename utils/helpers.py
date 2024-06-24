@@ -223,9 +223,11 @@ def train_SRNN_classifier_nowindow(batch_sz, data_type, num_steps, encoder, l1_c
         epoch_correct = 0
         epoch_total = 0
         for batch_idx in range(0, train_spiketrains.shape[0], batch_sz):
-            y = train_labels[batch_idx:batch_idx+batch_sz].long().to(device)
-            W = train_spiketrains[batch_idx:batch_idx+batch_sz].to(device)
-
+            y = train_labels[batch_idx:batch_idx+batch_sz].long()
+            y = y.to(device)
+            W = train_spiketrains[batch_idx:batch_idx+batch_sz]
+            W = W.to(device)
+            
             classifier_optimizer.zero_grad()
             spk, mem = classifier(W)
             _, preds = spk.sum(dim=0).max(1)
@@ -249,8 +251,10 @@ def train_SRNN_classifier_nowindow(batch_sz, data_type, num_steps, encoder, l1_c
             epoch_val_correct = 0
             epoch_val_total = 0
             for batch_idx in range(0, val_spiketrains.shape[0], batch_sz):
-                y = val_labels[batch_idx:batch_idx+batch_sz].long().to(device)
-                W = val_spiketrains[batch_idx:batch_idx+batch_sz].to(device)
+                y = val_labels[batch_idx:batch_idx+batch_sz].long()
+                y = y.to(device)
+                W = val_spiketrains[batch_idx:batch_idx+batch_sz]
+                W = W.to(device)
                 
                 classifier_optimizer.zero_grad()
                 spk, mem = classifier(W)
@@ -274,6 +278,7 @@ def train_SRNN_classifier_nowindow(batch_sz, data_type, num_steps, encoder, l1_c
     save_cls_loss_plot(cls_loss, cls_loss_val, folder, suff, data_type, fold_num)
     
     classifier.load_state_dict(best_classifier)
+    # classifier.load_state_dict(torch.load(f"results/{folder}/best_classifier_{data_type}{suff}.pth"))
     classifier.eval()
     
     # Remove cuda variables
@@ -283,7 +288,7 @@ def train_SRNN_classifier_nowindow(batch_sz, data_type, num_steps, encoder, l1_c
     val_labels = val_labels.cpu()
     test_spiketrains = test_spiketrains.cpu()
     test_labels = test_labels.cpu()
-    classifier.cpu()
+    classifier = classifier.cpu()
     torch.cuda.empty_cache()
     
     return classifier

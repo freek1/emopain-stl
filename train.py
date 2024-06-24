@@ -170,7 +170,7 @@ if __name__ == "__main__":
     window_size = 3000
     stride = window_size // 4 # 75% overlap
     n_spikes_per_timestep = 10
-    num_steps = 15 # Recurrent steps for the SRNN
+    num_steps = 10 # Recurrent steps for the SRNN
     encoder_epochs = 30
     classifier_epochs = 25
     theta = 0.99 # Threshold parameter for making spiketrains (semi-binary floats to actual ints)
@@ -206,8 +206,8 @@ if __name__ == "__main__":
             batch_sz = 8
         if data_type == "angle":
             batch_sz = 16
-        if n_spikes_per_timestep == 10:
-            batch_sz = batch_sz // 2
+        # if n_spikes_per_timestep == 10:
+        #     batch_sz = 1
         
         config = {
             "data_type": data_type,

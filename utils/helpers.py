@@ -196,11 +196,15 @@ def train_SRNN_classifier_nowindow(batch_sz, data_type, num_steps, encoder, l1_c
     
     len_spiketrain = train_spiketrains.shape[1]
     # TODO: SWITCH BACK TO LIF=0.5
-    classifier = RecurrentClassifier(len_spiketrain, lif_beta=0.9, num_steps=num_steps, l1_sz=l1_cls, l2_sz=l2_cls, n_classes=2)
+    classifier = RecurrentClassifier(len_spiketrain, lif_beta=0.99, num_steps=num_steps, l1_sz=l1_cls, l2_sz=l2_cls, n_classes=2)
     print(f"Classifier params: \t{sum(p.numel() for p in classifier.parameters() if p.requires_grad)}")
     
     classifier.to(device)
-    classifier_optimizer = torch.optim.AdamW(classifier.parameters(), lr=0.00075)
+    lr = 0.00075
+    classifier_optimizer = torch.optim.AdamW(classifier.parameters(), lr=lr)
+    if data_type == "emg" and suff == "_STL-V":
+        lr = 0.00001
+        classifier_optimizer = torch.optim.AdamW(classifier.parameters(), lr=lr, weight_decay=0.0001)
     loss_fn = torch.nn.CrossEntropyLoss()
     
     train_spiketrains = torch.Tensor(train_spiketrains)
@@ -289,7 +293,7 @@ def train_SRNN_classifier_nowindow(batch_sz, data_type, num_steps, encoder, l1_c
     val_labels = val_labels.cpu()
     test_spiketrains = test_spiketrains.cpu()
     test_labels = test_labels.cpu()
-    # classifier = classifier.cpu()
+    classifier = classifier.cpu()
     torch.cuda.empty_cache()
     
     return classifier

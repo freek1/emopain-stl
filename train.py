@@ -44,11 +44,11 @@ def main(config: dict, input_data: torch.Tensor, target_labels: torch.Tensor, fo
     print(f"FOLDER = '{folder} {encoding_method} {data_type}{suff}'")
     
     # Load results file to check if the current run was done already
-    # results_file = f"results/{folder}/results_{data_type}{suff}.csv"
-    # results = pd.read_csv(results_file)
-    # if fold_num in results.index or fold_num in results["fold"]:
-    #     print(f"Found current run in folder '{results_file}'! Skipping...")
-    #     return
+    results_file = f"results/{folder}/results_{data_type}{suff}.csv"
+    results = pd.read_csv(results_file)
+    if fold_num in results.index or fold_num in results["fold"]:
+        print(f"Found current run in folder '{results_file}'! Skipping...")
+        return
 
     # Split into test, val and train
     test_data, test_labels = input_data[test_index], target_labels[test_index]
@@ -178,7 +178,7 @@ if __name__ == "__main__":
     l2_sz = 0#3000 # Size of the second layer in the STL encoder
     l1_cls = 1000 # Size of the layer in the classifier
     l2_cls = 0 # Set to 0 to ignore
-    drop_p = 0.0 # Dropout setting
+    drop_p = 0.5 # Dropout setting
     encoding_method = "STL" # rate, latency, STL
     # NOTE: To activate the STL-Stacked, set l1sz (and l2sz) to your liking > 0
     #       To use STL-Vanilla, set l1_sz=l2_sz=0.

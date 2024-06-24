@@ -288,7 +288,7 @@ def train_SRNN_classifier_nowindow(batch_sz, data_type, num_steps, encoder, l1_c
     val_labels = val_labels.cpu()
     test_spiketrains = test_spiketrains.cpu()
     test_labels = test_labels.cpu()
-    classifier = classifier.cpu()
+    # classifier = classifier.cpu()
     torch.cuda.empty_cache()
     
     return classifier

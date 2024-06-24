@@ -195,7 +195,8 @@ def train_SRNN_classifier_nowindow(batch_sz, data_type, num_steps, encoder, l1_c
     test_labels = np.load(f"results/{folder}/spiketrains/labels_test_{data_type}_{fold_num}{suff}.npy")
     
     len_spiketrain = train_spiketrains.shape[1]
-    classifier = RecurrentClassifier(len_spiketrain, lif_beta=0.5, num_steps=num_steps, l1_sz=l1_cls, l2_sz=l2_cls, n_classes=2)
+    # TODO: SWITCH BACK TO LIF=0.5
+    classifier = RecurrentClassifier(len_spiketrain, lif_beta=0.9, num_steps=num_steps, l1_sz=l1_cls, l2_sz=l2_cls, n_classes=2)
     print(f"Classifier params: \t{sum(p.numel() for p in classifier.parameters() if p.requires_grad)}")
     
     classifier.to(device)

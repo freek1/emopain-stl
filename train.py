@@ -44,11 +44,11 @@ def main(config: dict, input_data: torch.Tensor, target_labels: torch.Tensor, fo
     print(f"FOLDER = '{folder} {encoding_method} {data_type}{suff}'")
     
     # Load results file to check if the current run was done already
-    results_file = f"results/{folder}/results_{data_type}{suff}.csv"
-    results = pd.read_csv(results_file)
-    if fold_num in results.index or fold_num in results["fold"]:
-        print(f"Found current run in folder '{results_file}'! Skipping...")
-        return
+    # results_file = f"results/{folder}/results_{data_type}{suff}.csv"
+    # results = pd.read_csv(results_file)
+    # if fold_num in results.index or fold_num in results["fold"]:
+    #     print(f"Found current run in folder '{results_file}'! Skipping...")
+    #     return
 
     # Split into test, val and train
     test_data, test_labels = input_data[test_index], target_labels[test_index]
@@ -169,13 +169,13 @@ if __name__ == "__main__":
     batch_sz = 46 # Gets overridden later for specific data_type
     window_size = 3000
     stride = window_size // 4 # 75% overlap
-    n_spikes_per_timestep = 10
+    n_spikes_per_timestep = 5
     num_steps = 10 # Recurrent steps for the SRNN
     encoder_epochs = 30
     classifier_epochs = 25
     theta = 0.99 # Threshold parameter for making spiketrains (semi-binary floats to actual ints)
-    l1_sz = 0#3000 # Size of the first layer in the STL encoder
-    l2_sz = 0#3000 # Size of the second layer in the STL encoder
+    l1_sz = 3000 # Size of the first layer in the STL encoder
+    l2_sz = 3000 # Size of the second layer in the STL encoder
     l1_cls = 1000 # Size of the layer in the classifier
     l2_cls = 0 # Set to 0 to ignore
     drop_p = 0.5 # Dropout setting
@@ -201,7 +201,7 @@ if __name__ == "__main__":
     for data_type in data_types:
         # Batch size findings from search
         if data_type == "emg":
-            batch_sz = 32
+            batch_sz = 16
         if data_type == "energy":
             batch_sz = 8
         if data_type == "angle":
@@ -236,7 +236,8 @@ if __name__ == "__main__":
         print(f"{data_type.capitalize()} data loaded:", input_data.shape, target_labels.shape)
         
         if SRNN:
-            folder = f"fixmi/emopain_srnn_{n_spikes_per_timestep}sp_{drop_p}dp"
+            # folder = f"fixmi/emopain_srnn_{n_spikes_per_timestep}sp_{drop_p}dp"
+            folder = f"fixmi/emopain_srnn_weighted_sum"
         elif SVM:
             folder = f"fixmi/emopain_svm_{n_spikes_per_timestep}sp"
             
@@ -247,9 +248,9 @@ if __name__ == "__main__":
         for fold_num, (train_index, test_index) in enumerate(cv.split(input_data, target_labels)):
             cls = "svm" if SVM else "srnn" if SRNN else "---"
             # Check if the spiketrain image is generated, if so, no need to compute whole fold again. 
-            if os.path.exists(f"imgs/{folder}/spiketrain_{cls}_{data_type}{suff}_{fold_num}.png"):    
-                print("Skipping fold", fold_num, data_type, suff)
-                continue 
+            # if os.path.exists(f"imgs/{folder}/spiketrain_{cls}_{data_type}{suff}_{fold_num}.png"):    
+            #     print("Skipping fold", fold_num, data_type, suff)
+            #     continue 
         
             if not os.path.exists(f"results/{folder}/results_{data_type}{suff}.csv"):
                 df = pd.DataFrame(columns=["fold", "train_acc", "val_acc", "test_acc", "test_preds", "test_labels", "sparsity"])

@@ -25,11 +25,13 @@ class EncoderLoss(torch.nn.Module):
         n_timesteps = X.shape[1]
         W_unflat = W.reshape(n_samples, n_timesteps, -1)
         n_spikes_per_timestep = W_unflat.shape[2]
-        W_sumspikes = torch.sum(W_unflat, dim=2) 
+        weights = torch.arange(1, n_spikes_per_timestep+1, dtype=W_unflat.dtype, device=W_unflat.device)
+        W_weighted_sumspikes = torch.sum(W_unflat * weights, dim=2)
+        # W_sumspikes = torch.sum(W_unflat, dim=2) 
         # NOTE: Sum instead of mean, since mean will be around 0.5 or slightly lower or higher, because we have extremes [0, 1]
         # sum gives a semi-count of how many times we have near-1 values
         
-        mi = compute_mutual_information(X, W_sumspikes)
+        mi = compute_mutual_information(X, W_weighted_sumspikes)
         
         mi_Z1 = 0 
         mi_Z2 = 0

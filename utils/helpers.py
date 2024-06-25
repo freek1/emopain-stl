@@ -287,12 +287,12 @@ def train_SRNN_classifier_nowindow(batch_sz, data_type, num_steps, encoder, l1_c
     classifier.eval()
     
     # Remove cuda variables
-    train_spiketrains = train_spiketrains.cpu()
-    train_labels = train_labels.cpu()
-    val_spiketrains = val_spiketrains.cpu()
-    val_labels = val_labels.cpu()
-    test_spiketrains = test_spiketrains.cpu()
-    test_labels = test_labels.cpu()
+    train_spiketrains = train_spiketrains.detach().cpu()
+    train_labels = train_labels.detach().cpu()
+    val_spiketrains = val_spiketrains.detach().cpu()
+    val_labels = val_labels.detach().cpu()
+    test_spiketrains = test_spiketrains.detach().cpu()
+    test_labels = test_labels.detach().cpu()
     classifier = classifier.cpu()
     torch.cuda.empty_cache()
     

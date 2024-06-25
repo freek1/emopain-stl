@@ -165,7 +165,7 @@ if __name__ == "__main__":
     
     device = torch.device("cuda")
 
-    data_types = ["emg"] # ["emg", "energy", "angle"] # emg, energy, angle
+    data_types = ["emg", "energy", "angle"] # emg, energy, angle
     batch_sz = 46 # Gets overridden later for specific data_type
     window_size = 3000
     stride = window_size // 4 # 75% overlap
@@ -188,26 +188,30 @@ if __name__ == "__main__":
     SVM = False
     SRNN = True
     
+    # Batch sizes for each data type
+    bsz = [None, None, None]
     if encoding_method == "rate":
         suff = "_rate"
+        bsz = [32, 4 ,16]
     elif encoding_method == "latency":
         suff = "_latency"
+        bsz = [4, 16, 16]
     elif encoding_method == "STL" and l1_sz == 0:
         suff = "_STL-V"
+        bsz = [8, 4, 8]
     elif encoding_method == "STL" and l1_sz > 0:
         suff = "_STL-S"
+        bsz = [32, 8, 16]
     
     args = []
     for data_type in data_types:
         # Batch size findings from search
         if data_type == "emg":
-            batch_sz = 32
+            batch_sz = bsz[0]
         if data_type == "energy":
-            batch_sz = 8
+            batch_sz = bsz[1]
         if data_type == "angle":
-            batch_sz = 16
-        # if n_spikes_per_timestep == 10:
-        #     batch_sz = 1
+            batch_sz = bsz[2]
         
         config = {
             "data_type": data_type,
@@ -237,7 +241,7 @@ if __name__ == "__main__":
         
         if SRNN:
             # folder = f"fixmi/emopain_srnn_{n_spikes_per_timestep}sp_{drop_p}dp"
-            folder = f"fixmi/emopain_srnn_weighted_sum"
+            folder = f"fixmi/emopain_srnn_ws_bsz"
         elif SVM:
             folder = f"fixmi/emopain_svm_{n_spikes_per_timestep}sp"
             
@@ -248,9 +252,9 @@ if __name__ == "__main__":
         for fold_num, (train_index, test_index) in enumerate(cv.split(input_data, target_labels)):
             cls = "svm" if SVM else "srnn" if SRNN else "---"
             # Check if the spiketrain image is generated, if so, no need to compute whole fold again. 
-            # if os.path.exists(f"imgs/{folder}/spiketrain_{cls}_{data_type}{suff}_{fold_num}.png"):    
-            #     print("Skipping fold", fold_num, data_type, suff)
-            #     continue 
+            if os.path.exists(f"imgs/{folder}/spiketrain_{cls}_{data_type}{suff}_{fold_num}.png"):    
+                print("Skipping fold", fold_num, data_type, suff)
+                continue 
         
             if not os.path.exists(f"results/{folder}/results_{data_type}{suff}.csv"):
                 df = pd.DataFrame(columns=["fold", "train_acc", "val_acc", "test_acc", "test_preds", "test_labels", "sparsity"])

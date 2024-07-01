@@ -1,6 +1,10 @@
 import torch
 
 class RepeatLayer(torch.nn.Module):
+    """
+    Copies neurons to match the target size.
+    The source size must be a divisor of the target size.
+    """
     def __init__(self, source_size, target_size):
         super(RepeatLayer, self).__init__()
         assert target_size > source_size, f"target_size must be greater than source_size: source={source_size}, target={target_size}."
@@ -33,6 +37,10 @@ class SpikeThresholdLearning(torch.nn.Module):
 
         self.output_size = output_size
         
+        # ###
+        # Logic to handle the hidden layers (or lack thereof)
+        # ###
+        # STAL-Vanilla case [no hidden layers]
         if self.l1_sz == 0:
             self.l2_sz = 0 # assumption we enforce
             
@@ -54,6 +62,7 @@ class SpikeThresholdLearning(torch.nn.Module):
                 
                 self.match_out = RepeatLayer(input_size, output_size)
         
+        # [one hidden layer]
         if self.l1_sz > 0 and self.l2_sz == 0:
             self.lin1 = torch.nn.Linear(input_size, self.l1_sz)
             self.relu1 = torch.nn.ReLU()
@@ -80,7 +89,7 @@ class SpikeThresholdLearning(torch.nn.Module):
                 
             self.match_out = RepeatLayer(l1_sz, output_size)
 
-        
+        # STAL-Stacked case [two hidden layers]
         if self.l1_sz > 0 and self.l2_sz > 0:
             self.lin1 = torch.nn.Linear(input_size, self.l1_sz)
             self.relu1 = torch.nn.ReLU()
@@ -130,8 +139,9 @@ class SpikeThresholdLearning(torch.nn.Module):
             
             self.match_out = RepeatLayer(self.l2_sz, output_size)
             
-        self.threshold_adder = torch.nn.Parameter(torch.Tensor(output_size).uniform_(0.4, 0.6), requires_grad=True) # NOTE: write down because part: (0.4, 0.6) to not have to have many weight updates to go from e.g. random 0.9 initialization to 0.1
-        
+        # Learnable threshold parameters
+        # Initialzed in the middle such that no large updates are needed (e.g. 0.99 -> 0.01)
+        self.threshold_adder = torch.nn.Parameter(torch.Tensor(output_size).uniform_(0.4, 0.6), requires_grad=True) 
         
     def forward(self, x):
         batch_size = x.size(0)
@@ -140,9 +150,11 @@ class SpikeThresholdLearning(torch.nn.Module):
         Z1 = None
         Z2 = None
         
+        # STAL-Vanilla case [no hidden layers]
         if self.l1_sz == 0:
             x = self.match_out(x)
         
+        # [one hidden layer]
         if self.l1_sz > 0 and self.l2_sz == 0:
             x = self.lin1(x)
             x = self.drop1(x)
@@ -154,6 +166,7 @@ class SpikeThresholdLearning(torch.nn.Module):
             
             x = self.match_out(x)
         
+        # STAL-Stacked case [two hidden layers]
         if self.l1_sz > 0 and self.l2_sz > 0:
             x = self.lin1(x)
             x = self.drop1(x)
@@ -173,14 +186,15 @@ class SpikeThresholdLearning(torch.nn.Module):
 
             x = self.match_out(x)
 
+        # Final surrogate thresholding
         extracted_feats = x
 
-        # NOTE: thesholds break the gradient propagation, so they cannot be used, 
+        # Binary thesholds break the gradient propagation, so they cannot be used, 
         # therefore we use a surrogate: sigmoid w/ slope=25
         alpha = 25.0
         thresholded_feats = torch.sigmoid(alpha * (extracted_feats - self.threshold_adder.unsqueeze(0)))
         
-        # NOTE: clamp the thresholds to avoid numerical instability
+        # Clamp the thresholds to avoid numerical instability
         with torch.no_grad():
             self.threshold_adder.clamp_(0.001, 1.0)
 

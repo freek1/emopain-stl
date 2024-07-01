@@ -10,7 +10,7 @@ import glob
 import pandas as pd
 import snntorch.functional as SF
 
-from utils.STL import SpikeThresholdLearning as STL
+from utils.STAL import SpikeThresholdLearning as STL
 from utils.EncoderLoss import EncoderLoss
 from utils.RecurrentClassifier import RecurrentClassifier
 
@@ -235,6 +235,8 @@ def train_SRNN_classifier_nowindow(batch_sz, data_type, num_steps, encoder, l1_c
             _, preds = spk.sum(dim=0).max(1)
             
             loss = torch.zeros((1), dtype=torch.float, device=device)
+            print(mem.shape)
+            exit(0)
             for step in range(num_steps):
                 loss += loss_fn(mem[step], y)
 

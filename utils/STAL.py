@@ -16,6 +16,7 @@ class RepeatLayer(torch.nn.Module):
         return x.repeat_interleave(self.repeat_param, dim=1)
 
 class SpikeThresholdLearning(torch.nn.Module):
+    """ The Spike Threshold Adaptive Learning (STAL) implementation! """
     def __init__(self, 
                  window_size:int, 
                  n_spikes_per_timestep:int,

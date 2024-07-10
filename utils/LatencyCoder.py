@@ -2,6 +2,7 @@ import torch
 from snntorch import spikegen
 
 class LatencyCoder(torch.nn.Module):
+    """ Latency-coding implementation """
     def __init__(self, window_size, n_channels, n_spikes_per_timestep):        
         super().__init__()
 
@@ -12,11 +13,9 @@ class LatencyCoder(torch.nn.Module):
         # reshape
         x = x.view(x.size(0), -1)
         spikes = spikegen.latency(x, num_steps=self.n_spikes_per_timestep, normalize=True)     
-        # [8, 10000, 784]
         spikes = spikes.permute(1, 2, 0)
         spikes = spikes.reshape(spikes.size(0), -1)  
-        # [10000, 6272]
-        # spikes, Z1, Z2
+        # spikes, Z1, Z2:
         return spikes, None, None
     
     def print_learnable_params(self):

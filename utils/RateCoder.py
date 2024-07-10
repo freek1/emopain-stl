@@ -2,6 +2,7 @@ import torch
 from snntorch import spikegen
 
 class RateCoder(torch.nn.Module):
+    """ Rate-coding implementation """
     def __init__(self, window_size, n_channels, n_spikes_per_timestep):        
         super().__init__()
 

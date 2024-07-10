@@ -2,6 +2,10 @@ import torch
 import numpy as np
 
 class EncoderLoss(torch.nn.Module):
+    """
+    (Novel) Encoder Loss function L = L_MI + L_S
+    Mutual Information part + Sparsity part.
+    """
     def __init__(self):
         super(EncoderLoss, self).__init__()
         self.__name__ = "EncoderLoss"
@@ -9,10 +13,10 @@ class EncoderLoss(torch.nn.Module):
 
     def forward(self, W, X, Z1, Z2):
         """
-        W: torch.Tensor, encoded 'spiketrain', not binarized yet
-        X: torch.Tensor, input signal
-        Z1: torch.Tensor, representation of Layer 1
-        Z2: torch.Tensor, representation of Layer 2
+        W: torch.Tensor[batch, omega, psi], encoded 'spiketrain', not binarized yet (\hat{B} in the paper)
+        X: torch.Tensor[batch, omega, psi], input signal (\hat{X} in the paper)
+        Z1: torch.Tensor[batch, omega, psi], representation of Layer 1
+        Z2: torch.Tensor[batch, omega, psi], representation of Layer 2
         """
         assert isinstance(X, torch.Tensor) and isinstance(W, torch.Tensor), "X and W must be torch tensors."
         
@@ -88,5 +92,4 @@ def compute_mutual_information(X, Z):
         pz = torch.max(pz, eps)
         
     mutual_information = joint_prob * torch.log2((joint_prob) / (px * pz))
-    # mutual_information = joint_prob * torch.log2((joint_prob) / px * pz)
     return mutual_information

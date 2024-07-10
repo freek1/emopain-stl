@@ -20,65 +20,87 @@ def train_STL_encoder(encoder: STL, device: torch.device,
                       encoder_epochs: int, window_size: int,
                       stride: int, folder: str, data_type: str,
                       fold_num:int, suff: str, verbose: bool = True):
+    # Initialize lists to store training and validation losses
     enc_loss = []
     enc_loss_val = []
-    
-    lowest_enc_val_loss = np.inf
+
+    # Initialize lowest validation loss and best encoder state
+    lowest_enc_val_loss = float('inf')
     best_encoder = None
-    
+
+    # Move the encoder model to the device (GPU or CPU)
     encoder = encoder.to(device)
+
     for epoch in tqdm(range(encoder_epochs), "Encoder"):
+        # Set the encoder model to training mode
         encoder.train()
         epoch_loss = 0
         for X, y in train_loader:
             for window in range(0, X.size(1) - window_size, stride):
+                # Extract a window of size `window_size` from the input sequence
                 X_window = X[:, window:window + window_size]
                 X_window = X_window.to(device)
                 X_window = X_window.nan_to_num_(0)
-                
+
+                # Flatten the windowed input data
                 X_flat = X_window.view(X_window.shape[0], -1)
                 y = y.to(device)
+
+                # Zero out the gradients of the encoder optimizer
                 encoder_optimizer.zero_grad()
-                
+
+                # Compute the output of the encoder model for the current window
                 W, Z1, Z2 = encoder(X_window)
                 loss = encoder_loss_fn(W, X_flat, Z1, Z2)
                 loss.backward()
                 encoder_optimizer.step()
                 epoch_loss += loss.item()
+
+        # Append the training loss to the list
         enc_loss.append(epoch_loss)
-        
+
+        # Evaluate the encoder model on the validation set
         encoder.eval()
         epoch_val_loss = 0
         with torch.no_grad():
             for X, y in val_loader:
                 for window in range(0, X.size(1) - window_size, stride):
+                    # Extract a window of size `window_size` from the input sequence
                     X_window = X[:, window:window + window_size]
                     X_window = X_window.to(device)
                     X_window = X_window.nan_to_num_(0)
-                    
+
+                    # Flatten the windowed input data
                     X_flat = X_window.view(X_window.shape[0], -1)
                     y = y.to(device)
+
+                    # Compute the output of the encoder model for the current window
                     W, Z1, Z2 = encoder(X_window)
                     loss = encoder_loss_fn(W, X_flat, Z1, Z2)
                     epoch_val_loss += loss.item()
+
+        # Append the validation loss to the list
         enc_loss_val.append(epoch_val_loss)
-        
+
+        # Check if the current validation loss is lower than the lowest recorded loss
         if epoch_val_loss < lowest_enc_val_loss:
+            # Update the lowest recorded loss and best encoder state
             lowest_enc_val_loss = epoch_val_loss
             best_encoder = encoder.state_dict()
             torch.save(best_encoder, f"results/{folder}/best_encoder_{data_type}{suff}.pth")
-    
+
+    # Save a plot of the training and validation losses if verbose mode is enabled
     if verbose:
         save_enc_loss_plot(enc_loss, enc_loss_val, folder, suff, fold_num)
-    
+
+    # Load the best encoder state from disk
     encoder.load_state_dict(torch.load(f"results/{folder}/best_encoder_{data_type}{suff}.pth"))
     encoder.eval()
-    
+
     return encoder
 
 def train_SRNN_classifier(batch_sz, data_type, num_steps, encoder, l1_cls, window_size, stride, device, folder, suff, fold_num, classifier_epochs):    
-    # loss_fn = SF.ce_rate_loss()
-    
+    # Load spiketrains
     train_spiketrains = np.load(f"results/{folder}/spiketrains/train_{data_type}_{fold_num}{suff}.npy")
     train_labels = np.load(f"results/{folder}/spiketrains/labels_train_{data_type}_{fold_num}{suff}.npy")
     val_spiketrains = np.load(f"results/{folder}/spiketrains/val_{data_type}_{fold_num}{suff}.npy")
@@ -86,10 +108,11 @@ def train_SRNN_classifier(batch_sz, data_type, num_steps, encoder, l1_cls, windo
     test_spiketrains = np.load(f"results/{folder}/spiketrains/test_{data_type}_{fold_num}{suff}.npy")
     test_labels = np.load(f"results/{folder}/spiketrains/labels_test_{data_type}_{fold_num}{suff}.npy")
     
-    len_spiketrain = train_spiketrains.shape[1]
+    # Init classifier
     classifier = RecurrentClassifier(encoder.output_size, lif_beta=0.5, num_steps=num_steps, l1_sz=l1_cls, n_classes=2)
     print(f"Classifier params: \t{sum(p.numel() for p in classifier.parameters() if p.requires_grad)}")
     
+    # Init loss func and optimizer
     classifier.to(device)
     classifier_optimizer = torch.optim.AdamW(classifier.parameters(), lr=0.001)
     loss_fn = torch.nn.CrossEntropyLoss()
@@ -109,13 +132,16 @@ def train_SRNN_classifier(batch_sz, data_type, num_steps, encoder, l1_cls, windo
     lowest_cls_val_loss = np.inf
     best_classifier = None
     
+    # Start training of the classifier
     for epoch in tqdm(range(classifier_epochs), "Classifier"):
         classifier.train()
         epoch_loss = 0
         epoch_correct = 0
         epoch_total = 0
+        # Train loop
         for batch_idx in range(0, train_spiketrains.shape[0], batch_sz):
             y = train_labels[batch_idx:batch_idx+batch_sz].long().to(device)
+            # Process data in windows
             for window in range(0, train_spiketrains.shape[1] - encoder.output_size + 1, stride):
                 W_window = train_spiketrains[batch_idx:batch_idx+batch_sz, window:window + encoder.output_size].to(device)
 
@@ -136,6 +162,7 @@ def train_SRNN_classifier(batch_sz, data_type, num_steps, encoder, l1_cls, windo
         cls_loss.append(epoch_loss)
         cls_acc.append(epoch_correct / epoch_total)
         
+        # Eval loop
         with torch.no_grad():
             classifier.eval()
             epoch_val_loss = 0
@@ -160,13 +187,16 @@ def train_SRNN_classifier(batch_sz, data_type, num_steps, encoder, l1_cls, windo
             cls_loss_val.append(epoch_val_loss)
             cls_acc_val.append(epoch_val_correct / epoch_val_total)
 
+        # Save the lowest loss classifier
         if epoch_val_loss < lowest_cls_val_loss:
             lowest_cls_val_loss = epoch_val_loss
             best_classifier = classifier.state_dict()
             torch.save(best_classifier, f"results/{folder}/best_classifier_{data_type}{suff}.pth")
     
+    # Make training curves plot
     save_cls_loss_plot(cls_loss, cls_loss_val, folder, suff, data_type)
     
+    # Load the best classifier
     classifier.load_state_dict(torch.load(f"results/{folder}/best_classifier_{data_type}{suff}.pth"))
     classifier.eval()
     
@@ -183,8 +213,8 @@ def train_SRNN_classifier(batch_sz, data_type, num_steps, encoder, l1_cls, windo
     return classifier
 
 def train_SRNN_classifier_nowindow(batch_sz, data_type, num_steps, encoder, l1_cls, l2_cls, window_size, stride, device, folder, suff, fold_num, classifier_epochs):    
-    # loss_fn = SF.ce_rate_loss()
-    
+    """ Same code as above, but without using windowed processing. Speeds up training (needs more VRAM)"""
+    # Load spiketrains
     train_spiketrains = np.load(f"results/{folder}/spiketrains/train_{data_type}_{fold_num}{suff}.npy")
     train_labels = np.load(f"results/{folder}/spiketrains/labels_train_{data_type}_{fold_num}{suff}.npy")
     val_spiketrains = np.load(f"results/{folder}/spiketrains/val_{data_type}_{fold_num}{suff}.npy")
@@ -199,6 +229,7 @@ def train_SRNN_classifier_nowindow(batch_sz, data_type, num_steps, encoder, l1_c
     classifier.to(device)
     lr = 0.00075
     classifier_optimizer = torch.optim.AdamW(classifier.parameters(), lr=lr)
+    # Attempt at better behaved training:
     if data_type == "emg" and suff == "_STL-V":
         lr = 0.00001
         classifier_optimizer = torch.optim.AdamW(classifier.parameters(), lr=lr, weight_decay=0.0001)
@@ -219,6 +250,7 @@ def train_SRNN_classifier_nowindow(batch_sz, data_type, num_steps, encoder, l1_c
     lowest_cls_val_loss = np.inf
     best_classifier = None
     
+    # Train
     for epoch in tqdm(range(classifier_epochs), "Classifier"):
         classifier.train()
         epoch_loss = 0
@@ -235,8 +267,6 @@ def train_SRNN_classifier_nowindow(batch_sz, data_type, num_steps, encoder, l1_c
             _, preds = spk.sum(dim=0).max(1)
             
             loss = torch.zeros((1), dtype=torch.float, device=device)
-            print(mem.shape)
-            exit(0)
             for step in range(num_steps):
                 loss += loss_fn(mem[step], y)
 
@@ -249,6 +279,7 @@ def train_SRNN_classifier_nowindow(batch_sz, data_type, num_steps, encoder, l1_c
         cls_loss.append(epoch_loss)
         cls_acc.append(epoch_correct / epoch_total)
         
+        # Eval
         with torch.no_grad():
             classifier.eval()
             epoch_val_loss = 0
@@ -274,15 +305,14 @@ def train_SRNN_classifier_nowindow(batch_sz, data_type, num_steps, encoder, l1_c
             cls_loss_val.append(epoch_val_loss)
             cls_acc_val.append(epoch_val_correct / epoch_val_total)
 
+        # Save best classifier
         if epoch_val_loss < lowest_cls_val_loss:
             lowest_cls_val_loss = epoch_val_loss
             best_classifier = classifier.state_dict()
-            # torch.save(best_classifier, f"results/{folder}/best_classifier_{data_type}{suff}.pth")
     
     save_cls_loss_plot(cls_loss, cls_loss_val, folder, suff, data_type, fold_num)
     
     classifier.load_state_dict(best_classifier)
-    # classifier.load_state_dict(torch.load(f"results/{folder}/best_classifier_{data_type}{suff}.pth"))
     classifier.eval()
     
     # Remove cuda variables
@@ -298,6 +328,7 @@ def train_SRNN_classifier_nowindow(batch_sz, data_type, num_steps, encoder, l1_c
     return classifier
 
 def save_enc_loss_plot(enc_loss: list, enc_loss_val: list, folder: str, suff: str, fold_num: int):
+    """ Saves a figure of the encoder training curves"""
     plt.figure(figsize=(8,6))
     plt.plot(enc_loss, label="train")
     plt.plot(enc_loss_val, label="val")
@@ -309,6 +340,7 @@ def save_enc_loss_plot(enc_loss: list, enc_loss_val: list, folder: str, suff: st
     plt.close()
     
 def save_cls_loss_plot(cls_loss: list, cls_loss_val: list, folder: str, suff: str, data_type: str, fold_num: int):
+    """ Saves figure of the classifier training curves"""
     plt.figure(figsize=(8,6))
     plt.plot(cls_loss, label="train")
     plt.plot(cls_loss_val, label="val")
@@ -320,16 +352,14 @@ def save_cls_loss_plot(cls_loss: list, cls_loss_val: list, folder: str, suff: st
     plt.close()
 
 def classify_svm(n_spikes_per_timestep, n_channels, folder, data_type, suff, fold_num, avg_window_sz):
+    """ Classifies the spiketrains using an average windowed SVM classifier.
+     This is not used in the paper, since we ignore temporal information by averaging the spiketrains
+     in the psi dimension.
+    """
     classifier_svm = SVC(kernel='linear', C=1.0, random_state=1957)
     print("Training SVM...")
 
     # NOTE: load from emopain_svm.
-    # train_spiketrains = np.load(f"results/emopain_svm/spiketrains/train_{data_type}_{fold_num}{suff}.npy")
-    # train_labels = np.load(f"results/emopain_svm/spiketrains/labels_train_{data_type}_{fold_num}{suff}.npy")
-    # val_spiketrains = np.load(f"results/emopain_svm/spiketrains/val_{data_type}_{fold_num}{suff}.npy")
-    # val_labels = np.load(f"results/emopain_svm/spiketrains/labels_val_{data_type}_{fold_num}{suff}.npy")
-    # test_spiketrains = np.load(f"results/emopain_svm/spiketrains/test_{data_type}_{fold_num}{suff}.npy")
-    # test_labels = np.load(f"results/emopain_svm/spiketrains/labels_test_{data_type}_{fold_num}{suff}.npy")
     train_spiketrains = np.load(f"results/{folder}/spiketrains/train_{data_type}_{fold_num}{suff}.npy")
     train_labels = np.load(f"results/{folder}/spiketrains/labels_train_{data_type}_{fold_num}{suff}.npy")
     val_spiketrains = np.load(f"results/{folder}/spiketrains/val_{data_type}_{fold_num}{suff}.npy")
@@ -419,22 +449,27 @@ def classify_svm(n_spikes_per_timestep, n_channels, folder, data_type, suff, fol
     return
 
 def classify_srnn(classifier, encoder_output_size, folder, data_type, fold_num, suff, device, window_size, n_channels, n_spikes_per_timestep):
-    print("Training SRNN...")
+    """ Classifies the spiketrains using the trained classifier object (SRNN)."""
+    print("Classifying with SRNN...")
+    # Ensure classifier is on correct device and eval mode
     classifier.to(device)
     classifier.eval()
 
+    # Load test data
     test_spiketrains = np.load(f"results/{folder}/spiketrains/test_{data_type}_{fold_num}{suff}.npy")
     test_labels = np.load(f"results/{folder}/spiketrains/labels_test_{data_type}_{fold_num}{suff}.npy")
     
     print(test_spiketrains.shape)
     print(test_labels.shape)
     
+    # Compute sparsity (spike density)
     spk_inp_test = test_spiketrains
     n_spikes = np.sum(spk_inp_test)
     total_spikes = np.prod(spk_inp_test.shape)
     sparsity = n_spikes / total_spikes
     print("Sparsity", sparsity)
     
+    # Inference
     test_input = torch.Tensor(test_spiketrains)
     test_target = torch.Tensor(test_labels)
     cls_correct_test = 0
@@ -466,6 +501,7 @@ def classify_srnn(classifier, encoder_output_size, folder, data_type, fold_num, 
     results_file = pd.concat([results_file, results])
     results_file.to_csv(f"results/{folder}/results_{data_type}{suff}.csv")
     
+    # Make final results figures: encoded spiketrain
     idx = 0
     
     W0 = test_spiketrains[idx]
@@ -492,6 +528,7 @@ def classify_srnn(classifier, encoder_output_size, folder, data_type, fold_num, 
     return
 
 def classify_srnn_nowindow(classifier, encoder_output_size, folder, data_type, fold_num, suff, device, window_size, n_channels, n_spikes_per_timestep):
+    """ Same code as above, but without using windows. (Faster) """
     print("Training SRNN...")
     classifier.to(device)
     classifier.eval()

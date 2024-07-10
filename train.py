@@ -42,13 +42,6 @@ def main(config: dict, input_data: torch.Tensor, target_labels: torch.Tensor, fo
     SRNN = config["SRNN"]
     
     print(f"FOLDER = '{folder} {encoding_method} {data_type}{suff}'")
-    
-    # Load results file to check if the current run was done already
-    # results_file = f"results/{folder}/results_{data_type}{suff}.csv"
-    # results = pd.read_csv(results_file)
-    # if fold_num in results.index or fold_num in results["fold"]:
-    #     print(f"Found current run in folder '{results_file}'! Skipping...")
-    #     return
 
     # Split into test, val and train
     test_data, test_labels = input_data[test_index], target_labels[test_index]
@@ -95,9 +88,7 @@ def main(config: dict, input_data: torch.Tensor, target_labels: torch.Tensor, fo
     print(f"Encoder params: \t{sum(p.numel() for p in encoder.parameters() if p.requires_grad)}")
     
     # Get/save the spike-trains
-    # NOTE: We now always pick spiketrians from emopain_svm folder, since they don't change.
     saved_spiketrains = glob.glob(f"results/{folder}/spiketrains/labels_*_{data_type}_{fold_num}{suff}.npy")
-    # saved_spiketrains = glob.glob(f"results/emopain_svm/spiketrains/labels_*_{data_type}_{fold_num}{suff}.npy")
     if len(saved_spiketrains) < 3:
         print(f"Generating spiketrain...: results/{folder}/spiketrains/labels_train_{data_type}_{fold_num}{suff}.npy")
         
@@ -115,7 +106,6 @@ def main(config: dict, input_data: torch.Tensor, target_labels: torch.Tensor, fo
         generate_spiketrains(encoder, test_loader, fold_num, theta, suff, "test", data_type, window_size, device, folder)
     else:    
         print("Spiketrains already generated: ", f"results/{folder}/spiketrains/train_{data_type}_{fold_num}{suff}.npy")
-        # print("Spiketrains already generated: ", f"results/emopain_svm/spiketrains/train_{data_type}_{fold_num}{suff}.npy")
     
     # Initialize the classifier
     if SVM:
@@ -126,6 +116,8 @@ def main(config: dict, input_data: torch.Tensor, target_labels: torch.Tensor, fo
         classify_srnn_nowindow(classifier, encoder.output_size, folder, data_type, fold_num, suff, device, window_size, n_channels, n_spikes_per_timestep)
         
 def generate_spiketrains(encoder, loader, fold_num, theta, suff, split, data_type, window_size, device, folder):
+    """ Code to generate spiketrains from the encoder. 
+    Also saves them"""
     batch_spiketrains = []
     batch_labels = []
     for X, y in loader:
@@ -167,7 +159,7 @@ if __name__ == "__main__":
 
     data_types = ["emg", "energy", "angle"] # emg, energy, angle
     batch_sz = 46 # Gets overridden later for specific data_type
-    window_size = 3000
+    window_size = 3000 # Used for the encoder
     stride = window_size // 4 # 75% overlap
     n_spikes_per_timestep = 5
     num_steps = 10 # Recurrent steps for the SRNN
@@ -205,7 +197,7 @@ if __name__ == "__main__":
     
     args = []
     for data_type in data_types:
-        # Batch size findings from search
+        # Batch size findings from hyperparam search
         if data_type == "emg":
             batch_sz = bsz[0]
         if data_type == "energy":
@@ -235,6 +227,7 @@ if __name__ == "__main__":
             "SRNN": SRNN
         }
         
+        # Leave One Subject Out crossval
         cv = LeaveOneOut()
         input_data, target_labels = load_data_emopain(data_type)
         print(f"{data_type.capitalize()} data loaded:", input_data.shape, target_labels.shape)
@@ -249,6 +242,7 @@ if __name__ == "__main__":
         os.makedirs(f"results/{folder}/spiketrains", exist_ok=True)
         os.makedirs(f"imgs/{folder}", exist_ok=True) 
 
+        # Load the configurations in a list, to be executed later.
         for fold_num, (train_index, test_index) in enumerate(cv.split(input_data, target_labels)):
             cls = "svm" if SVM else "srnn" if SRNN else "---"
             # Check if the spiketrain image is generated, if so, no need to compute whole fold again. 
@@ -279,6 +273,7 @@ if __name__ == "__main__":
     start = time.time()
     for arg in args:
         main(*arg)
+    # Use code below to process in parallel.
     # with mp.Pool(16) as p:
     #     p.starmap(main, args)
     

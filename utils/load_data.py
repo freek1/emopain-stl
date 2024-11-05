@@ -14,12 +14,12 @@ def load_data_emopain(data_type: str):
     if use_protective_label:
         print("----- NOTE:")
         print("SET TO USING RATER INFORMATION FOR PROTECTIVE LABELS")
-        suffix = {"_rater"}
+        suffix = {'_rater'}
     
     # Load data
-    with open(f'data/data_Cs{suffix}.pickle', 'rb') as f:
+    with open(f'data/data_Cs_rater.pickle', 'rb') as f:
         data_Cs = pickle.load(f)
-    with open(f'data/data_Ps{suffix}.pickle', 'rb') as f:
+    with open(f'data/data_Ps_rater.pickle', 'rb') as f:
         data_Ps = pickle.load(f)
     
     n_channels = 0 # placeholder

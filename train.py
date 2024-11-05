@@ -11,7 +11,7 @@ import time
 import glob
 import json
 
-from utils.STL import SpikeThresholdLearning
+from utils.STAL import SpikeThresholdLearning
 from utils.RateCoder import RateCoder
 from utils.LatencyCoder import LatencyCoder
 from utils.EncoderLoss import EncoderLoss
@@ -155,7 +155,7 @@ if __name__ == "__main__":
     torch.manual_seed(1957)
     np.random.seed(1957)
     
-    device = torch.device("cuda")
+    device = torch.device("cuda") # cuda
 
     data_types = ["emg", "energy", "angle"] # emg, energy, angle
     batch_sz = 46 # Gets overridden later for specific data_type
@@ -166,12 +166,12 @@ if __name__ == "__main__":
     encoder_epochs = 30
     classifier_epochs = 25
     theta = 0.99 # Threshold parameter for making spiketrains (semi-binary floats to actual ints)
-    l1_sz = 3000 # Size of the first layer in the STL encoder
-    l2_sz = 3000 # Size of the second layer in the STL encoder
+    l1_sz = 0 # Size of the first layer in the STL encoder
+    l2_sz = 0 # Size of the second layer in the STL encoder
     l1_cls = 500 # Size of the layer in the classifier
     l2_cls = 0 # Set to 0 to ignore
     drop_p = 0.5 # Dropout setting
-    encoding_method = "STL" # rate, latency, STL
+    encoding_method = "latency" # rate, latency, STL
     # NOTE: To activate the STL-Stacked, set l1sz (and l2sz) to your liking > 0
     #       To use STL-Vanilla, set l1_sz=l2_sz=0.
     avg_window_sz = 100 # For averaging the spiketrains to use as features for the SVM classifier
@@ -184,10 +184,12 @@ if __name__ == "__main__":
     bsz = [None, None, None]
     if encoding_method == "rate":
         suff = "_rate"
-        bsz = [32, 4 ,16]
+        bsz = [32, 4, 16]
+        bsz = [32, 4, 8]
     elif encoding_method == "latency":
         suff = "_latency"
         bsz = [4, 16, 16]
+        bsz = [4, 8, 8]
     elif encoding_method == "STL" and l1_sz == 0:
         suff = "_STL-V"
         bsz = [8, 4, 8]
@@ -199,11 +201,11 @@ if __name__ == "__main__":
     for data_type in data_types:
         # Batch size findings from hyperparam search
         if data_type == "emg":
-            batch_sz = bsz[0]
+            batch_sz = bsz[0]//2
         if data_type == "energy":
-            batch_sz = bsz[1]
+            batch_sz = bsz[1]//2
         if data_type == "angle":
-            batch_sz = bsz[2]
+            batch_sz = bsz[2]//2
         
         config = {
             "data_type": data_type,
@@ -234,7 +236,7 @@ if __name__ == "__main__":
         
         if SRNN:
             # folder = f"fixmi/emopain_srnn_{n_spikes_per_timestep}sp_{drop_p}dp"
-            folder = f"fixmi/emopain_srnn_ws_bsz"
+            folder = f"fixmi/emopain_protective"
         elif SVM:
             folder = f"fixmi/emopain_svm_{n_spikes_per_timestep}sp"
             

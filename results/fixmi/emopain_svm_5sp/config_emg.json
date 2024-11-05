@@ -1,1 +1,0 @@
-{"data_type": "emg", "batch_sz": 46, "window_size": 3000, "stride": 750, "n_spikes_per_timestep": 5, "num_steps": 15, "encoder_epochs": 30, "classifier_epochs": 25, "theta": 0.99, "l1_sz": 3000, "l2_sz": 3000, "l1_cls": 1000, "l2_cls": 0, "drop_p": 0.0, "encoding_method": "STL", "avg_window_sz": 100, "suff": "_STL-S", "SVM": true, "SRNN": false}

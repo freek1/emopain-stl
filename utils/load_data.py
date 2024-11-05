@@ -9,10 +9,17 @@ def load_data_emopain(data_type: str):
     """
     assert data_type in ["emg", "energy", "angle"], "data_type must be either 'emg', 'energy' or 'angle'."
 
+    suffix = ""
+    use_protective_label = True
+    if use_protective_label:
+        print("----- NOTE:")
+        print("SET TO USING RATER INFORMATION FOR PROTECTIVE LABELS")
+        suffix = {"_rater"}
+    
     # Load data
-    with open('data/data_Cs.pickle', 'rb') as f:
+    with open(f'data/data_Cs{suffix}.pickle', 'rb') as f:
         data_Cs = pickle.load(f)
-    with open('data/data_Ps.pickle', 'rb') as f:
+    with open(f'data/data_Ps{suffix}.pickle', 'rb') as f:
         data_Ps = pickle.load(f)
     
     n_channels = 0 # placeholder

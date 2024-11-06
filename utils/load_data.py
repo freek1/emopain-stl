@@ -79,3 +79,34 @@ def load_data_emopain(data_type: str):
     
     return input_data, target_labels
     
+def load_data_roshambo():
+    # Specify the folder path
+    X = np.load("roshambo/X_roshambo.npy")
+    y = np.load("roshambo/y_roshambo.npy")
+    
+    X = np.array(X, dtype=np.float32)
+    n_samples, n_timesteps, n_channels = X.shape
+    # normalize data to [0, 1]
+    for chan in range(n_channels):
+        for s in range(n_samples):
+            x = X[s, :, chan]
+            # x -= torch.tensor(np.nanmin(x.numpy(), 1, keepdims=True)[0])
+            # Normalize the data between 0 and 1
+            x = np.abs(x)
+            min_ = np.min(x, axis=0, keepdims=True)[0]
+            x = x - min_ # get all positive
+            max_ = np.max(x, axis=0, keepdims=True)[0]
+            x = x / np.array(max_, dtype=np.float32)
+            # normalized_data = x * 2 - 1
+            # Test if the data is normalized
+            # assert np.all((normalized_data >= 0) & (normalized_data <= 1))
+            X[s, :, chan] = x
+    # for chan in range(n_channels):
+    #     x = X[:, :, chan]
+    #     # x -= torch.tensor(np.nanmin(x.numpy(), 1, keepdims=True)[0])
+    #     x -= x.min(1, keepdims=True)[0]
+    #     # x /= torch.tensor(np.nanmax(x.numpy(), 1, keepdims=True)[0])
+    #     x /= x.max(1, keepdims=True)[0]
+    #     X[:, :, chan] = x
+        
+    return torch.tensor(X, dtype=torch.float32), torch.tensor(y-1, dtype=torch.long)

@@ -4,7 +4,7 @@ import torch
 from torch.optim import AdamW
 from torch.utils.data import DataLoader, TensorDataset, WeightedRandomSampler
 import multiprocessing as mp
-from sklearn.model_selection import train_test_split, LeaveOneOut
+from sklearn.model_selection import train_test_split, StratifiedKFold
 import pandas as pd
 import os
 import time
@@ -16,7 +16,7 @@ from utils.RateCoder import RateCoder
 from utils.LatencyCoder import LatencyCoder
 from utils.EncoderLoss import EncoderLoss
 from utils.helpers import train_STL_encoder, train_SRNN_classifier, train_SRNN_classifier_nowindow, classify_svm, classify_srnn, classify_srnn_nowindow
-from utils.load_data import load_data_emopain
+from utils.load_data import load_data_emopain, load_data_roshambo
 
 # See __main__ below for config settings.
 
@@ -54,22 +54,22 @@ def main(config: dict, input_data: torch.Tensor, target_labels: torch.Tensor, fo
     val_dataset = TensorDataset(val_data, val_labels)
     test_dataset = TensorDataset(test_data, test_labels)
 
-    # Count the number of positive and negative samples in the training set
-    pos_count = (train_labels == 1).sum().item()
-    neg_count = (train_labels == 0).sum().item()
+    # # Count the number of positive and negative samples in the training set
+    # pos_count = (train_labels == 1).sum().item()
+    # neg_count = (train_labels == 0).sum().item()
 
-    # Compute weights for each sample
-    total_samples = len(train_labels)
-    weights = torch.zeros(total_samples)
-    weights[train_labels == 1] = 1.0 / pos_count
-    weights[train_labels == 0] = 1.0 / neg_count
+    # # Compute weights for each sample
+    # total_samples = len(train_labels)
+    # weights = torch.zeros(total_samples)
+    # weights[train_labels == 1] = 1.0 / pos_count
+    # weights[train_labels == 0] = 1.0 / neg_count
     
-    # Create the WeightedRandomSampler
-    # NOTE: num_samples = batch_sz*2, since we want to over-sample the minority class.
-    sampler = WeightedRandomSampler(weights, num_samples=len(train_labels), replacement=True)
+    # # Create the WeightedRandomSampler
+    # # NOTE: num_samples = batch_sz*2, since we want to over-sample the minority class.
+    # sampler = WeightedRandomSampler(weights, num_samples=len(train_labels), replacement=True)
 
     # Create DataLoaders with the sampler
-    train_loader = DataLoader(train_dataset, batch_size=batch_sz, sampler=sampler)
+    train_loader = DataLoader(train_dataset, batch_size=batch_sz)
     val_loader = DataLoader(val_dataset, batch_size=batch_sz, shuffle=False)
     test_loader = DataLoader(test_dataset, batch_size=batch_sz, shuffle=False)
     
@@ -122,14 +122,12 @@ def generate_spiketrains(encoder, loader, fold_num, theta, suff, split, data_typ
     batch_labels = []
     for X, y in loader:
         spk_batch = []
-        for window in range(0, X.size(1) - window_size + 1, window_size):
-            X_window = X[:, window:window + window_size].to(device)
-            X_window = X_window.nan_to_num_(0)
-            
-            spiketrain, Z1, Z2 = encoder(X_window)
-            spiketrain_cpu = spiketrain.cpu().detach().numpy()
-            spk_inputs = (spiketrain_cpu > theta).astype(np.float32)
-            spk_batch.append(spk_inputs)
+        X = X.to(device)
+        
+        spiketrain, Z1, Z2 = encoder(X)
+        spiketrain_cpu = spiketrain.cpu().detach().numpy()
+        spk_inputs = (spiketrain_cpu > theta).astype(np.float32)
+        spk_batch.append(spk_inputs)
         
         spk_batch = np.concatenate(spk_batch, axis=1)
         batch_spiketrains.append(spk_batch)
@@ -155,23 +153,23 @@ if __name__ == "__main__":
     torch.manual_seed(1957)
     np.random.seed(1957)
     
-    device = torch.device("cuda") # cuda
+    device = torch.device("cpu") # cuda
 
-    data_types = ["emg", "energy", "angle"] # emg, energy, angle
-    batch_sz = 46 # Gets overridden later for specific data_type
-    window_size = 3000 # Used for the encoder
+    data_types = ["roshambo"] # emg, energy, angle
+    batch_sz = 20 # Gets overridden later for specific data_type
+    window_size = 400 # Used for the encoder
     stride = window_size // 4 # 75% overlap
     n_spikes_per_timestep = 5
     num_steps = 10 # Recurrent steps for the SRNN
     encoder_epochs = 30
     classifier_epochs = 25
     theta = 0.99 # Threshold parameter for making spiketrains (semi-binary floats to actual ints)
-    l1_sz = 0 # Size of the first layer in the STL encoder
-    l2_sz = 0 # Size of the second layer in the STL encoder
+    l1_sz = 200 # Size of the first layer in the STL encoder
+    l2_sz = 200 # Size of the second layer in the STL encoder
     l1_cls = 500 # Size of the layer in the classifier
     l2_cls = 0 # Set to 0 to ignore
     drop_p = 0.5 # Dropout setting
-    encoding_method = "latency" # rate, latency, STL
+    encoding_method = "STL" # rate, latency, STL
     # NOTE: To activate the STL-Stacked, set l1sz (and l2sz) to your liking > 0
     #       To use STL-Vanilla, set l1_sz=l2_sz=0.
     avg_window_sz = 100 # For averaging the spiketrains to use as features for the SVM classifier
@@ -181,31 +179,31 @@ if __name__ == "__main__":
     SRNN = True
     
     # Batch sizes for each data type
-    bsz = [None, None, None]
+    bsz = [batch_sz] * 3
     if encoding_method == "rate":
         suff = "_rate"
-        bsz = [32, 4, 16]
-        bsz = [32, 4, 8]
+        # bsz = [32, 4, 16]
     elif encoding_method == "latency":
         suff = "_latency"
-        bsz = [4, 16, 16]
-        bsz = [4, 8, 8]
+        # bsz = [4, 16, 16]
     elif encoding_method == "STL" and l1_sz == 0:
         suff = "_STL-V"
-        bsz = [8, 4, 8]
+        # bsz = [8, 4, 8]
     elif encoding_method == "STL" and l1_sz > 0:
         suff = "_STL-S"
-        bsz = [32, 8, 16]
+        # bsz = [32, 8, 16]
     
     args = []
     for data_type in data_types:
         # Batch size findings from hyperparam search
         if data_type == "emg":
-            batch_sz = bsz[0]//2
+            batch_sz = bsz[0]
         if data_type == "energy":
-            batch_sz = bsz[1]//2
+            batch_sz = bsz[1]
         if data_type == "angle":
-            batch_sz = bsz[2]//2
+            batch_sz = bsz[2]
+        if data_type == "roshambo":
+            batch_sz = bsz[0]
         
         config = {
             "data_type": data_type,
@@ -229,16 +227,16 @@ if __name__ == "__main__":
             "SRNN": SRNN
         }
         
-        # Leave One Subject Out crossval
-        cv = LeaveOneOut()
-        input_data, target_labels = load_data_emopain(data_type)
+        # 3-fold cross-validation
+        cv = StratifiedKFold(n_splits=3)
+        # input_data, target_labels = load_data_emopain(data_type)
+        input_data, target_labels = load_data_roshambo()
         print(f"{data_type.capitalize()} data loaded:", input_data.shape, target_labels.shape)
         
         if SRNN:
-            # folder = f"fixmi/emopain_srnn_{n_spikes_per_timestep}sp_{drop_p}dp"
-            folder = f"fixmi/emopain_protective"
+            folder = f"roshambo"
         elif SVM:
-            folder = f"fixmi/emopain_svm_{n_spikes_per_timestep}sp"
+            folder = f"roshambo_svm"
             
         os.makedirs(f"results/{folder}", exist_ok=True)
         os.makedirs(f"results/{folder}/spiketrains", exist_ok=True)

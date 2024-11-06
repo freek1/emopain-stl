@@ -1,0 +1,1 @@
+{"data_type": "roshambo", "batch_sz": 20, "window_size": 400, "stride": 100, "n_spikes_per_timestep": 5, "num_steps": 10, "encoder_epochs": 30, "classifier_epochs": 25, "theta": 0.99, "l1_sz": 200, "l2_sz": 200, "l1_cls": 500, "l2_cls": 0, "drop_p": 0.5, "encoding_method": "STL", "avg_window_sz": 100, "suff": "_STL-S", "SVM": false, "SRNN": true}

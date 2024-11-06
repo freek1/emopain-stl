@@ -223,7 +223,7 @@ def train_SRNN_classifier_nowindow(batch_sz, data_type, num_steps, encoder, l1_c
     test_labels = np.load(f"results/{folder}/spiketrains/labels_test_{data_type}_{fold_num}{suff}.npy")
     
     len_spiketrain = train_spiketrains.shape[1]
-    classifier = RecurrentClassifier(len_spiketrain, lif_beta=0.99, num_steps=num_steps, l1_sz=l1_cls, l2_sz=l2_cls, n_classes=2)
+    classifier = RecurrentClassifier(len_spiketrain, lif_beta=0.99, num_steps=num_steps, l1_sz=l1_cls, l2_sz=l2_cls, n_classes=3)
     print(f"Classifier params: \t{sum(p.numel() for p in classifier.parameters() if p.requires_grad)}")
     
     classifier.to(device)
@@ -237,6 +237,7 @@ def train_SRNN_classifier_nowindow(batch_sz, data_type, num_steps, encoder, l1_c
     
     train_spiketrains = torch.Tensor(train_spiketrains)
     train_labels = torch.Tensor(train_labels)
+    print(train_spiketrains.shape, train_labels.shape)
     val_spiketrains = torch.Tensor(val_spiketrains)
     val_labels = torch.Tensor(val_labels)
     test_spiketrains = torch.Tensor(test_spiketrains)
@@ -256,7 +257,8 @@ def train_SRNN_classifier_nowindow(batch_sz, data_type, num_steps, encoder, l1_c
         epoch_loss = 0
         epoch_correct = 0
         epoch_total = 0
-        for batch_idx in range(0, train_spiketrains.shape[0], batch_sz):
+
+        for batch_idx in range(0, train_labels.shape[0], batch_sz):
             y = train_labels[batch_idx:batch_idx+batch_sz].long()
             y = y.to(device)
             W = train_spiketrains[batch_idx:batch_idx+batch_sz]
@@ -285,7 +287,7 @@ def train_SRNN_classifier_nowindow(batch_sz, data_type, num_steps, encoder, l1_c
             epoch_val_loss = 0
             epoch_val_correct = 0
             epoch_val_total = 0
-            for batch_idx in range(0, val_spiketrains.shape[0], batch_sz):
+            for batch_idx in range(0, val_labels.shape[0], batch_sz):
                 y = val_labels[batch_idx:batch_idx+batch_sz].long()
                 y = y.to(device)
                 W = val_spiketrains[batch_idx:batch_idx+batch_sz]
@@ -550,15 +552,18 @@ def classify_srnn_nowindow(classifier, encoder_output_size, folder, data_type, f
     cls_correct_test = 0
     cls_total_test = 0
 
-    spk_inputs = test_input.to(device)
-    y = test_target.to(device)
-    
-    spk, mem = classifier(spk_inputs)
-    _, preds = spk.sum(dim=0).max(1)
-    preds = preds.detach().cpu().numpy()
+    for batch_idx in range(0, test_spiketrains.shape[0], 32):
+        spk_inputs = test_input[batch_idx:batch_idx+32].to(device)
+        y = test_target[batch_idx:batch_idx+32].to(device)
+        
+        spk, mem = classifier(spk_inputs)
+        _, preds = spk.sum(dim=0).max(1) # sum the srnn time steps, max over classes
+        preds = preds.detach().cpu().numpy()
+        y = y.detach().cpu().numpy()
 
-    cls_correct_test += (preds == test_labels).sum().item()
-    cls_total_test += y.size(0)
+        cls_correct_test += np.sum(preds == y)
+        cls_total_test += len(y)
+        
     cls_acc_test = cls_correct_test / cls_total_test * 100
     print(f"Test Accuracy: \t\t{cls_acc_test:.3f}%")
     

@@ -153,7 +153,7 @@ if __name__ == "__main__":
     torch.manual_seed(1957)
     np.random.seed(1957)
     
-    device = torch.device("cpu") # cuda
+    device = torch.device("mps") # cuda
 
     data_types = ["roshambo"] # emg, energy, angle
     batch_sz = 20 # Gets overridden later for specific data_type
@@ -246,9 +246,9 @@ if __name__ == "__main__":
         for fold_num, (train_index, test_index) in enumerate(cv.split(input_data, target_labels)):
             cls = "svm" if SVM else "srnn" if SRNN else "---"
             # Check if the spiketrain image is generated, if so, no need to compute whole fold again. 
-            if os.path.exists(f"imgs/{folder}/spiketrain_{cls}_{data_type}{suff}_{fold_num}.png"):    
-                print("Skipping fold", fold_num, data_type, suff)
-                continue 
+            # if os.path.exists(f"imgs/{folder}/spiketrain_{cls}_{data_type}{suff}_{fold_num}.png"):    
+            #     print("Skipping fold", fold_num, data_type, suff)
+            #     continue 
         
             if not os.path.exists(f"results/{folder}/results_{data_type}{suff}.csv"):
                 df = pd.DataFrame(columns=["fold", "train_acc", "val_acc", "test_acc", "test_preds", "test_labels", "sparsity"])

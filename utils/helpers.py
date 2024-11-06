@@ -551,6 +551,8 @@ def classify_srnn_nowindow(classifier, encoder_output_size, folder, data_type, f
     test_target = torch.Tensor(test_labels)
     cls_correct_test = 0
     cls_total_test = 0
+    predictions = []
+    labels = []
 
     for batch_idx in range(0, test_spiketrains.shape[0], 32):
         spk_inputs = test_input[batch_idx:batch_idx+32].to(device)
@@ -560,7 +562,10 @@ def classify_srnn_nowindow(classifier, encoder_output_size, folder, data_type, f
         _, preds = spk.sum(dim=0).max(1) # sum the srnn time steps, max over classes
         preds = preds.detach().cpu().numpy()
         y = y.detach().cpu().numpy()
-
+        
+        predictions.extend(preds)
+        labels.extend(y)
+        
         cls_correct_test += np.sum(preds == y)
         cls_total_test += len(y)
         
@@ -574,8 +579,8 @@ def classify_srnn_nowindow(classifier, encoder_output_size, folder, data_type, f
         'train_acc': -1, 
         'val_acc': -1, 
         'test_acc': cls_acc_test, 
-        'test_preds': preds, 
-        'test_labels': test_labels, 
+        'test_preds': [int(p) for p in predictions], 
+        'test_labels': [int(l) for l in labels], 
         'sparsity': sparsity
     }])
     results_file = pd.concat([results_file, results])

@@ -6,14 +6,17 @@ class RecurrentClassifier(torch.nn.Module):
     
     Note: some commented code was used for testing of a more complex 2 hidden-layer implementation.
     This is not used in the final paper. """
-    def __init__(self, encoder_output_size: int, lif_beta: float, l1_sz: int, l2_sz: int, n_classes: int, num_steps: int):
+    def __init__(self, window_size: int, n_spikes_per_timestep: int, n_channels: int, lif_beta: float, l1_sz: int, l2_sz: int, n_classes: int, num_steps: int):
         super().__init__()
 
         print("Using Recurrent Classifier: Recurrent LIF Neurons.")
 
         self.num_steps = num_steps
+        self.window_size = window_size
+        self.n_spikes_per_timestep = n_spikes_per_timestep
+        self.n_channels = n_channels
         
-        self.fc1 = torch.nn.Linear(encoder_output_size, l1_sz)
+        self.fc1 = torch.nn.Linear(window_size * n_channels, l1_sz)
         self.rlif1 = snn.RLeaky(beta=lif_beta, linear_features=l1_sz, V=1)
         
         # Code for adapting to 2 hidden layers (not used in the paper):
@@ -47,9 +50,11 @@ class RecurrentClassifier(torch.nn.Module):
         #         mem_rec.append(mem3)
         # else:
         
+        x = x.reshape(x.size(0), self.n_spikes_per_timestep, self.window_size * self.n_channels)
+        
         spk2, mem2 = self.rlif2.init_rleaky()
-        for _ in range(self.num_steps):
-            cur1 = self.fc1(x)
+        for i in range(self.n_spikes_per_timestep):
+            cur1 = self.fc1(x[:, i]) # give the input per spike timestep
             spk1, mem1 = self.rlif1(cur1, spk1, mem1)
             cur2 = self.fc2(spk1)
             spk2, mem2 = self.rlif2(cur2, spk2, mem2)

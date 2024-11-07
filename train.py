@@ -40,6 +40,7 @@ def main(config: dict, input_data: torch.Tensor, target_labels: torch.Tensor, fo
     suff = config["suff"] # STL, rate, latency
     SVM = config["SVM"]
     SRNN = config["SRNN"]
+    generate_spikes = config["generate_spikes"]
     
     print(f"FOLDER = '{folder} {encoding_method} {data_type}{suff}'")
 
@@ -89,7 +90,7 @@ def main(config: dict, input_data: torch.Tensor, target_labels: torch.Tensor, fo
     
     # Get/save the spike-trains
     saved_spiketrains = glob.glob(f"results/{folder}/spiketrains/labels_*_{data_type}_{fold_num}{suff}.npy")
-    if len(saved_spiketrains) < 3:
+    if len(saved_spiketrains) < 3 or generate_spikes:
         print(f"Generating spiketrain...: results/{folder}/spiketrains/labels_train_{data_type}_{fold_num}{suff}.npy")
         
         # Train the encoder, if method is STL
@@ -112,8 +113,8 @@ def main(config: dict, input_data: torch.Tensor, target_labels: torch.Tensor, fo
         classify_svm(n_spikes_per_timestep, n_channels, folder, data_type, suff, fold_num, avg_window_sz)
         
     if SRNN:
-        classifier = train_SRNN_classifier_nowindow(batch_sz, data_type, num_steps, encoder, l1_cls, l2_cls, window_size, stride, device, folder, suff, fold_num, classifier_epochs)
-        classify_srnn_nowindow(classifier, encoder.output_size, folder, data_type, fold_num, suff, device, window_size, n_channels, n_spikes_per_timestep)
+        classifier = train_SRNN_classifier_nowindow(batch_sz, n_spikes_per_timestep, n_channels, data_type, num_steps, encoder, l1_cls, l2_cls, window_size, stride, device, folder, suff, fold_num, classifier_epochs)
+        classify_srnn_nowindow(classifier, 0, folder, data_type, fold_num, suff, device, window_size, n_channels, n_spikes_per_timestep)
         
 def generate_spiketrains(encoder, loader, fold_num, theta, suff, split, data_type, window_size, device, folder):
     """ Code to generate spiketrains from the encoder. 
@@ -156,24 +157,26 @@ if __name__ == "__main__":
     device = torch.device("mps") # cuda
 
     data_types = ["roshambo"] # emg, energy, angle
-    batch_sz = 20 # Gets overridden later for specific data_type
+    batch_sz = 40
     window_size = 400 # Used for the encoder
     stride = window_size // 4 # 75% overlap
-    n_spikes_per_timestep = 5
+    n_spikes_per_timestep = 15
     num_steps = 10 # Recurrent steps for the SRNN
-    encoder_epochs = 30
-    classifier_epochs = 25
+    encoder_epochs = 300
+    classifier_epochs = 50
     theta = 0.99 # Threshold parameter for making spiketrains (semi-binary floats to actual ints)
-    l1_sz = 200 # Size of the first layer in the STL encoder
-    l2_sz = 200 # Size of the second layer in the STL encoder
+    l1_sz = 800 # 800 # Size of the first layer in the STL encoder
+    l2_sz = 400 # 400 # Size of the second layer in the STL encoder
     l1_cls = 500 # Size of the layer in the classifier
-    l2_cls = 0 # Set to 0 to ignore
-    drop_p = 0.5 # Dropout setting
+    # l2_cls = 250 # Set to 0 to ignore
+    drop_p = 0.1 # Dropout setting
     encoding_method = "STL" # rate, latency, STL
     # NOTE: To activate the STL-Stacked, set l1sz (and l2sz) to your liking > 0
     #       To use STL-Vanilla, set l1_sz=l2_sz=0.
     avg_window_sz = 100 # For averaging the spiketrains to use as features for the SVM classifier
-
+    
+    generate_spikes = True # Regenerate the spiketrains? (e.g. if you changed the encoder algorithm)
+    
     # Set either one to True
     SVM = False
     SRNN = True
@@ -218,13 +221,14 @@ if __name__ == "__main__":
             "l1_sz": l1_sz,
             "l2_sz": l2_sz,
             "l1_cls": l1_cls,
-            "l2_cls": l2_cls,
+            "l2_cls": 0,
             "drop_p": drop_p,
             "encoding_method": encoding_method,
             "avg_window_sz": avg_window_sz,
             "suff": suff,
             "SVM": SVM,
-            "SRNN": SRNN
+            "SRNN": SRNN,
+            "generate_spikes": generate_spikes
         }
         
         # 3-fold cross-validation

@@ -36,25 +36,24 @@ def train_STL_encoder(encoder: STL, device: torch.device,
         encoder.train()
         epoch_loss = 0
         for X, y in train_loader:
-            for window in range(0, X.size(1) - window_size, stride):
-                # Extract a window of size `window_size` from the input sequence
-                X_window = X[:, window:window + window_size]
-                X_window = X_window.to(device)
-                X_window = X_window.nan_to_num_(0)
+            # Extract a window of size `window_size` from the input sequence
+            X = X.to(device)
+            X = X.nan_to_num_(0)
 
-                # Flatten the windowed input data
-                X_flat = X_window.view(X_window.shape[0], -1)
-                y = y.to(device)
+            # Flatten the windowed input data
+            X_flat = X.view(X.shape[0], -1)
+            y = y.to(device)
 
-                # Zero out the gradients of the encoder optimizer
-                encoder_optimizer.zero_grad()
+            # Zero out the gradients of the encoder optimizer
+            encoder_optimizer.zero_grad()
 
-                # Compute the output of the encoder model for the current window
-                W, Z1, Z2 = encoder(X_window)
-                loss = encoder_loss_fn(W, X_flat, Z1, Z2)
-                loss.backward()
-                encoder_optimizer.step()
-                epoch_loss += loss.item()
+            # Compute the output of the encoder model for the current window
+            W, Z1, Z2 = encoder(X)
+            loss = encoder_loss_fn(W, X_flat, Z1, Z2)
+            
+            loss.backward()
+            encoder_optimizer.step()
+            epoch_loss += loss.item()
 
         # Append the training loss to the list
         enc_loss.append(epoch_loss)
@@ -64,20 +63,18 @@ def train_STL_encoder(encoder: STL, device: torch.device,
         epoch_val_loss = 0
         with torch.no_grad():
             for X, y in val_loader:
-                for window in range(0, X.size(1) - window_size, stride):
-                    # Extract a window of size `window_size` from the input sequence
-                    X_window = X[:, window:window + window_size]
-                    X_window = X_window.to(device)
-                    X_window = X_window.nan_to_num_(0)
+                # Extract a window of size `window_size` from the input sequence
+                X = X.to(device)
+                X = X.nan_to_num_(0)
 
-                    # Flatten the windowed input data
-                    X_flat = X_window.view(X_window.shape[0], -1)
-                    y = y.to(device)
+                # Flatten the windowed input data
+                X_flat = X.view(X.shape[0], -1)
+                y = y.to(device)
 
-                    # Compute the output of the encoder model for the current window
-                    W, Z1, Z2 = encoder(X_window)
-                    loss = encoder_loss_fn(W, X_flat, Z1, Z2)
-                    epoch_val_loss += loss.item()
+                # Compute the output of the encoder model for the current window
+                W, Z1, Z2 = encoder(X)
+                loss = encoder_loss_fn(W, X_flat, Z1, Z2)
+                epoch_val_loss += loss.item()
 
         # Append the validation loss to the list
         enc_loss_val.append(epoch_val_loss)
@@ -109,7 +106,7 @@ def train_SRNN_classifier(batch_sz, data_type, num_steps, encoder, l1_cls, windo
     test_labels = np.load(f"results/{folder}/spiketrains/labels_test_{data_type}_{fold_num}{suff}.npy")
     
     # Init classifier
-    classifier = RecurrentClassifier(encoder.output_size, lif_beta=0.5, num_steps=num_steps, l1_sz=l1_cls, n_classes=2)
+    classifier = RecurrentClassifier(window_size=0, n_spikes_per_timestep=0, n_channels=0, lif_beta=0.5, num_steps=num_steps, l1_sz=l1_cls, n_classes=2)
     print(f"Classifier params: \t{sum(p.numel() for p in classifier.parameters() if p.requires_grad)}")
     
     # Init loss func and optimizer
@@ -212,7 +209,7 @@ def train_SRNN_classifier(batch_sz, data_type, num_steps, encoder, l1_cls, windo
     
     return classifier
 
-def train_SRNN_classifier_nowindow(batch_sz, data_type, num_steps, encoder, l1_cls, l2_cls, window_size, stride, device, folder, suff, fold_num, classifier_epochs):    
+def train_SRNN_classifier_nowindow(batch_sz, n_spikes_per_timestep, n_channels, data_type, num_steps, encoder, l1_cls, l2_cls, window_size, stride, device, folder, suff, fold_num, classifier_epochs):    
     """ Same code as above, but without using windowed processing. Speeds up training (needs more VRAM)"""
     # Load spiketrains
     train_spiketrains = np.load(f"results/{folder}/spiketrains/train_{data_type}_{fold_num}{suff}.npy")
@@ -222,12 +219,11 @@ def train_SRNN_classifier_nowindow(batch_sz, data_type, num_steps, encoder, l1_c
     test_spiketrains = np.load(f"results/{folder}/spiketrains/test_{data_type}_{fold_num}{suff}.npy")
     test_labels = np.load(f"results/{folder}/spiketrains/labels_test_{data_type}_{fold_num}{suff}.npy")
     
-    len_spiketrain = train_spiketrains.shape[1]
-    classifier = RecurrentClassifier(len_spiketrain, lif_beta=0.99, num_steps=num_steps, l1_sz=l1_cls, l2_sz=l2_cls, n_classes=3)
+    classifier = RecurrentClassifier(window_size=window_size, n_spikes_per_timestep=n_spikes_per_timestep, n_channels=n_channels, lif_beta=0.99, num_steps=num_steps, l1_sz=l1_cls, l2_sz=l2_cls, n_classes=3)
     print(f"Classifier params: \t{sum(p.numel() for p in classifier.parameters() if p.requires_grad)}")
     
     classifier.to(device)
-    lr = 0.00075
+    lr = 1e-4
     classifier_optimizer = torch.optim.AdamW(classifier.parameters(), lr=lr)
     # Attempt at better behaved training:
     if data_type == "emg" and suff == "_STL-V":
@@ -237,7 +233,6 @@ def train_SRNN_classifier_nowindow(batch_sz, data_type, num_steps, encoder, l1_c
     
     train_spiketrains = torch.Tensor(train_spiketrains)
     train_labels = torch.Tensor(train_labels)
-    print(train_spiketrains.shape, train_labels.shape)
     val_spiketrains = torch.Tensor(val_spiketrains)
     val_labels = torch.Tensor(val_labels)
     test_spiketrains = torch.Tensor(test_spiketrains)

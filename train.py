@@ -160,17 +160,17 @@ if __name__ == "__main__":
     batch_sz = 40
     window_size = 400 # Used for the encoder
     stride = window_size // 4 # 75% overlap
-    n_spikes_per_timestep = 15
+    n_spikes_per_timestep = 25
     num_steps = 10 # Recurrent steps for the SRNN
     encoder_epochs = 300
     classifier_epochs = 50
     theta = 0.99 # Threshold parameter for making spiketrains (semi-binary floats to actual ints)
-    l1_sz = 800 # 800 # Size of the first layer in the STL encoder
-    l2_sz = 400 # 400 # Size of the second layer in the STL encoder
+    l1_sz = 0 # 800 # Size of the first layer in the STL encoder
+    l2_sz = 0 # 400 # Size of the second layer in the STL encoder
     l1_cls = 500 # Size of the layer in the classifier
     # l2_cls = 250 # Set to 0 to ignore
     drop_p = 0.1 # Dropout setting
-    encoding_method = "STL" # rate, latency, STL
+    encoding_method = "latency" # rate, latency, STL
     # NOTE: To activate the STL-Stacked, set l1sz (and l2sz) to your liking > 0
     #       To use STL-Vanilla, set l1_sz=l2_sz=0.
     avg_window_sz = 100 # For averaging the spiketrains to use as features for the SVM classifier

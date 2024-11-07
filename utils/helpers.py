@@ -147,7 +147,7 @@ def train_SRNN_classifier(batch_sz, data_type, num_steps, encoder, l1_cls, windo
                 _, preds = spk.sum(dim=0).max(1)
                 
                 loss = torch.zeros((1), dtype=torch.float, device=device)
-                for step in range(num_steps):
+                for step in range(0): # TODO: replace with n_spikes_per_timestep and add parameters
                     loss += loss_fn(mem[step], y)
 
                 loss.backward()
@@ -175,7 +175,7 @@ def train_SRNN_classifier(batch_sz, data_type, num_steps, encoder, l1_cls, windo
                     _, preds = spk.sum(dim=0).max(1)
                     
                     loss = torch.zeros((1), dtype=torch.float, device=device)
-                    for step in range(num_steps):
+                    for step in range(n_spikes_per_timestep):
                         loss += loss_fn(mem[step], y)
                         
                     epoch_val_loss += loss.item()
@@ -264,7 +264,7 @@ def train_SRNN_classifier_nowindow(batch_sz, n_spikes_per_timestep, n_channels, 
             _, preds = spk.sum(dim=0).max(1)
             
             loss = torch.zeros((1), dtype=torch.float, device=device)
-            for step in range(num_steps):
+            for step in range(n_spikes_per_timestep):
                 loss += loss_fn(mem[step], y)
 
             loss.backward()
@@ -293,7 +293,7 @@ def train_SRNN_classifier_nowindow(batch_sz, n_spikes_per_timestep, n_channels, 
                 _, preds = spk.sum(dim=0).max(1)
                 
                 loss = torch.zeros((1), dtype=torch.float, device=device)
-                for step in range(num_steps):
+                for step in range(n_spikes_per_timestep):
                     loss += loss_fn(mem[step], y)
                     
                 epoch_val_loss += loss.item()

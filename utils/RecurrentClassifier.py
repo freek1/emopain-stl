@@ -1,5 +1,6 @@
 import torch
 import snntorch as snn
+from snntorch._neurons.slstm import SLSTM
 
 class RecurrentClassifier(torch.nn.Module):
     """ Spiking Recurrent Neural Network (SRNN) implementation. 
@@ -30,7 +31,29 @@ class RecurrentClassifier(torch.nn.Module):
         
         self.fc2 = torch.nn.Linear(l1_sz, n_classes)
         self.rlif2 = snn.RLeaky(beta=lif_beta, linear_features=n_classes, V=1)
+        
+        # Experimetnt: SLSTM
+        # self.slstm1 = SLSTM(input_size=window_size * n_channels, hidden_size=l1_sz)
+        # self.slstm2 = SLSTM(input_size=l1_sz, hidden_size=n_classes)
 
+    def forward_lstm(self, x):
+        syn1, mem1 = self.slstm1.init_slstm()
+        syn2, mem2 = self.slstm2.init_slstm()
+        
+        spk2_rec = []
+        mem2_rec = []
+
+        x = x.reshape(x.size(0), self.n_spikes_per_timestep, self.window_size * self.n_channels)
+
+        for i in range(self.n_spikes_per_timestep):
+            spk1, syn1, mem1 = self.slstm1(x[:, i], syn1, mem1)
+            spk2, syn2, mem2 = self.slstm2(spk1, syn2, mem2)
+
+            spk2_rec.append(spk2)
+            mem2_rec.append(mem2)
+            
+        return torch.stack(spk2_rec), torch.stack(mem2_rec)
+        
     def forward(self, x):
         spk1, mem1 = self.rlif1.init_rleaky()
         spk_rec, mem_rec = [], []

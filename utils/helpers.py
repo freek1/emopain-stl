@@ -150,7 +150,7 @@ def train_SRNN_classifier(batch_sz, data_type, num_steps, encoder, l1_cls, windo
                 _, preds = spk.sum(dim=0).max(1)
                 
                 loss = torch.zeros((1), dtype=torch.float, device=device)
-                for step in range(num_steps):
+                for step in range(num_steps): # TODO: fix parameters and change to n_spikes_per_timestep
                     loss += loss_fn(mem[step], y)
 
                 loss.backward()
@@ -178,7 +178,7 @@ def train_SRNN_classifier(batch_sz, data_type, num_steps, encoder, l1_cls, windo
                     _, preds = spk.sum(dim=0).max(1)
                     
                     loss = torch.zeros((1), dtype=torch.float, device=device)
-                    for step in range(num_steps):
+                    for step in range(n_spikes_per_timestep):
                         loss += loss_fn(mem[step], y)
                         
                     epoch_val_loss += loss.item()
@@ -212,7 +212,7 @@ def train_SRNN_classifier(batch_sz, data_type, num_steps, encoder, l1_cls, windo
     
     return classifier
 
-def train_SRNN_classifier_nowindow(batch_sz, data_type, num_steps, encoder, l1_cls, l2_cls, window_size, stride, device, folder, suff, fold_num, classifier_epochs):    
+def train_SRNN_classifier_nowindow(batch_sz, n_spikes_per_timestep, n_channels, data_type, num_steps, encoder, l1_cls, l2_cls, window_size, stride, device, folder, suff, fold_num, classifier_epochs):    
     """ Same code as above, but without using windowed processing. Speeds up training (needs more VRAM)"""
     # Load spiketrains
     train_spiketrains = np.load(f"results/{folder}/spiketrains/train_{data_type}_{fold_num}{suff}.npy")
@@ -222,8 +222,7 @@ def train_SRNN_classifier_nowindow(batch_sz, data_type, num_steps, encoder, l1_c
     test_spiketrains = np.load(f"results/{folder}/spiketrains/test_{data_type}_{fold_num}{suff}.npy")
     test_labels = np.load(f"results/{folder}/spiketrains/labels_test_{data_type}_{fold_num}{suff}.npy")
     
-    len_spiketrain = train_spiketrains.shape[1]
-    classifier = RecurrentClassifier(len_spiketrain, lif_beta=0.99, num_steps=num_steps, l1_sz=l1_cls, l2_sz=l2_cls, n_classes=2)
+    classifier = RecurrentClassifier(window_size=window_size, n_spikes_per_timestep=n_spikes_per_timestep, n_channels=n_channels, lif_beta=0.99, num_steps=num_steps, l1_sz=l1_cls, l2_sz=l2_cls, n_classes=2)
     print(f"Classifier params: \t{sum(p.numel() for p in classifier.parameters() if p.requires_grad)}")
     
     classifier.to(device)
@@ -267,7 +266,7 @@ def train_SRNN_classifier_nowindow(batch_sz, data_type, num_steps, encoder, l1_c
             _, preds = spk.sum(dim=0).max(1)
             
             loss = torch.zeros((1), dtype=torch.float, device=device)
-            for step in range(num_steps):
+            for step in range(n_spikes_per_timestep):
                 loss += loss_fn(mem[step], y)
 
             loss.backward()
@@ -296,7 +295,7 @@ def train_SRNN_classifier_nowindow(batch_sz, data_type, num_steps, encoder, l1_c
                 _, preds = spk.sum(dim=0).max(1)
                 
                 loss = torch.zeros((1), dtype=torch.float, device=device)
-                for step in range(num_steps):
+                for step in range(n_spikes_per_timestep):
                     loss += loss_fn(mem[step], y)
                     
                 epoch_val_loss += loss.item()

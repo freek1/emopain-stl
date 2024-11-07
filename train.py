@@ -40,6 +40,7 @@ def main(config: dict, input_data: torch.Tensor, target_labels: torch.Tensor, fo
     suff = config["suff"] # STL, rate, latency
     SVM = config["SVM"]
     SRNN = config["SRNN"]
+    generate_spikes = config["generate_spikes"]
     
     print(f"FOLDER = '{folder} {encoding_method} {data_type}{suff}'")
 
@@ -89,7 +90,7 @@ def main(config: dict, input_data: torch.Tensor, target_labels: torch.Tensor, fo
     
     # Get/save the spike-trains
     saved_spiketrains = glob.glob(f"results/{folder}/spiketrains/labels_*_{data_type}_{fold_num}{suff}.npy")
-    if len(saved_spiketrains) < 3:
+    if len(saved_spiketrains) < 3 or generate_spikes:
         print(f"Generating spiketrain...: results/{folder}/spiketrains/labels_train_{data_type}_{fold_num}{suff}.npy")
         
         # Train the encoder, if method is STL
@@ -112,8 +113,8 @@ def main(config: dict, input_data: torch.Tensor, target_labels: torch.Tensor, fo
         classify_svm(n_spikes_per_timestep, n_channels, folder, data_type, suff, fold_num, avg_window_sz)
         
     if SRNN:
-        classifier = train_SRNN_classifier_nowindow(batch_sz, data_type, num_steps, encoder, l1_cls, l2_cls, window_size, stride, device, folder, suff, fold_num, classifier_epochs)
-        classify_srnn_nowindow(classifier, encoder.output_size, folder, data_type, fold_num, suff, device, window_size, n_channels, n_spikes_per_timestep)
+        classifier = train_SRNN_classifier_nowindow(batch_sz, n_spikes_per_timestep, n_channels, data_type, num_steps, encoder, l1_cls, l2_cls, window_size, stride, device, folder, suff, fold_num, classifier_epochs)
+        classify_srnn_nowindow(classifier, 0, folder, data_type, fold_num, suff, device, window_size, n_channels, n_spikes_per_timestep)
         
 def generate_spiketrains(encoder, loader, fold_num, theta, suff, split, data_type, window_size, device, folder):
     """ Code to generate spiketrains from the encoder. 
@@ -162,19 +163,21 @@ if __name__ == "__main__":
     window_size = 3000 # Used for the encoder
     stride = window_size // 4 # 75% overlap
     n_spikes_per_timestep = 5
-    num_steps = 10 # Recurrent steps for the SRNN
+    num_steps = 0 # Recurrent steps for the SRNN [unnused]
     encoder_epochs = 30
     classifier_epochs = 25
     theta = 0.99 # Threshold parameter for making spiketrains (semi-binary floats to actual ints)
-    l1_sz = 3000 # Size of the first layer in the STL encoder
-    l2_sz = 3000 # Size of the second layer in the STL encoder
+    l1_sz = 0 # Size of the first layer in the STL encoder
+    l2_sz = 0 # Size of the second layer in the STL encoder
     l1_cls = 500 # Size of the layer in the classifier
     l2_cls = 0 # Set to 0 to ignore
     drop_p = 0.5 # Dropout setting
-    encoding_method = "STL" # rate, latency, STL
+    encoding_method = "latency" # rate, latency, STL
     # NOTE: To activate the STL-Stacked, set l1sz (and l2sz) to your liking > 0
     #       To use STL-Vanilla, set l1_sz=l2_sz=0.
     avg_window_sz = 100 # For averaging the spiketrains to use as features for the SVM classifier
+
+    generate_spikes = True
 
     # Set either one to True
     SVM = False
@@ -185,27 +188,28 @@ if __name__ == "__main__":
     if encoding_method == "rate":
         suff = "_rate"
         bsz = [32, 4, 16]
-        bsz = [32, 4, 8]
     elif encoding_method == "latency":
         suff = "_latency"
         bsz = [4, 16, 16]
-        bsz = [4, 8, 8]
     elif encoding_method == "STL" and l1_sz == 0:
         suff = "_STL-V"
         bsz = [8, 4, 8]
     elif encoding_method == "STL" and l1_sz > 0:
         suff = "_STL-S"
         bsz = [32, 8, 16]
+        
+    # override bsz:
+    bsz = [4] * 3
     
     args = []
     for data_type in data_types:
         # Batch size findings from hyperparam search
         if data_type == "emg":
-            batch_sz = bsz[0]//2
+            batch_sz = bsz[0]
         if data_type == "energy":
-            batch_sz = bsz[1]//2
+            batch_sz = bsz[1]
         if data_type == "angle":
-            batch_sz = bsz[2]//2
+            batch_sz = bsz[2]
         
         config = {
             "data_type": data_type,
@@ -226,7 +230,8 @@ if __name__ == "__main__":
             "avg_window_sz": avg_window_sz,
             "suff": suff,
             "SVM": SVM,
-            "SRNN": SRNN
+            "SRNN": SRNN,
+            "generate_spikes": generate_spikes
         }
         
         # Leave One Subject Out crossval
@@ -236,9 +241,9 @@ if __name__ == "__main__":
         
         if SRNN:
             # folder = f"fixmi/emopain_srnn_{n_spikes_per_timestep}sp_{drop_p}dp"
-            folder = f"fixmi/emopain_protective"
+            folder = f"emopain_protective"
         elif SVM:
-            folder = f"fixmi/emopain_svm_{n_spikes_per_timestep}sp"
+            folder = f"emopain_svm_{n_spikes_per_timestep}sp"
             
         os.makedirs(f"results/{folder}", exist_ok=True)
         os.makedirs(f"results/{folder}/spiketrains", exist_ok=True)

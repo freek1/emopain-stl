@@ -158,26 +158,26 @@ if __name__ == "__main__":
     
     device = torch.device("cuda") # cuda
 
-    data_types = ["emg", "energy", "angle"] # emg, energy, angle
+    data_types = ["emg, energy, angle"] # emg, energy, angle
     batch_sz = 46 # Gets overridden later for specific data_type
     window_size = 3000 # Used for the encoder
     stride = window_size // 4 # 75% overlap
     n_spikes_per_timestep = 5
     num_steps = 0 # Recurrent steps for the SRNN [unnused]
     encoder_epochs = 30
-    classifier_epochs = 25
+    classifier_epochs = 50
     theta = 0.99 # Threshold parameter for making spiketrains (semi-binary floats to actual ints)
-    l1_sz = 0 # Size of the first layer in the STL encoder
-    l2_sz = 0 # Size of the second layer in the STL encoder
+    l1_sz = 3000 # Size of the first layer in the STL encoder
+    l2_sz = 3000 # Size of the second layer in the STL encoder
     l1_cls = 500 # Size of the layer in the classifier
     l2_cls = 0 # Set to 0 to ignore
     drop_p = 0.5 # Dropout setting
-    encoding_method = "latency" # rate, latency, STL
+    encoding_method = "STL" # rate, latency, STL
     # NOTE: To activate the STL-Stacked, set l1sz (and l2sz) to your liking > 0
     #       To use STL-Vanilla, set l1_sz=l2_sz=0.
     avg_window_sz = 100 # For averaging the spiketrains to use as features for the SVM classifier
 
-    generate_spikes = True
+    generate_spikes = False # Override for making the spiketrains (if they are already generated in the folder)
 
     # Set either one to True
     SVM = False

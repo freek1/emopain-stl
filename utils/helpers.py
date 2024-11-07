@@ -226,12 +226,8 @@ def train_SRNN_classifier_nowindow(batch_sz, n_spikes_per_timestep, n_channels, 
     print(f"Classifier params: \t{sum(p.numel() for p in classifier.parameters() if p.requires_grad)}")
     
     classifier.to(device)
-    lr = 0.00075
+    lr = 1e-5
     classifier_optimizer = torch.optim.AdamW(classifier.parameters(), lr=lr)
-    # Attempt at better behaved training:
-    if data_type == "emg" and suff == "_STL-V":
-        lr = 0.00001
-        classifier_optimizer = torch.optim.AdamW(classifier.parameters(), lr=lr, weight_decay=0.0001)
     loss_fn = torch.nn.CrossEntropyLoss()
     
     train_spiketrains = torch.Tensor(train_spiketrains)

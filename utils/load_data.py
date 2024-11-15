@@ -17,9 +17,9 @@ def load_data_emopain(data_type: str):
         suffix = {'_rater'}
     
     # Load data
-    with open(f'data/data_Cs_rater.pickle', 'rb') as f:
+    with open(f'data/data_Cs_protect_kappa.pickle', 'rb') as f:
         data_Cs = pickle.load(f)
-    with open(f'data/data_Ps_rater.pickle', 'rb') as f:
+    with open(f'data/data_Ps_protect_kappa.pickle', 'rb') as f:
         data_Ps = pickle.load(f)
     
     n_channels = 0 # placeholder

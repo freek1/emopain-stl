@@ -158,7 +158,7 @@ if __name__ == "__main__":
     
     device = torch.device("cuda") # cuda
 
-    data_types = ["emg, energy, angle"] # emg, energy, angle
+    data_types = ["angle"] # emg, energy, angle
     batch_sz = 46 # Gets overridden later for specific data_type
     window_size = 3000 # Used for the encoder
     stride = window_size // 4 # 75% overlap
@@ -241,7 +241,7 @@ if __name__ == "__main__":
         
         if SRNN:
             # folder = f"fixmi/emopain_srnn_{n_spikes_per_timestep}sp_{drop_p}dp"
-            folder = f"emopain_protective"
+            folder = f"emopain_protective_kappa"
         elif SVM:
             folder = f"emopain_svm_{n_spikes_per_timestep}sp"
             

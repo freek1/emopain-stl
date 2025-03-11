@@ -4,6 +4,8 @@ Learnable Spike-Train Encoder Architecture for the EmoPain dataset.
 [![STAL Architecture](https://i.postimg.cc/wBLbV902/LAST-png.png)](https://postimg.cc/QBNbNZLK)
 
 ---
+Published in [IEEE TSNRE](https://ieeexplore.ieee.org/document/10908225).
+
 Paper is published as pre-print to be found at [ArXiv](https://arxiv.org/abs/2407.08362) and [ResearchGate](https://www.researchgate.net/publication/382150158_STAL_Spike_Threshold_Adaptive_Learning_Encoder_for_Classification_of_Pain-Related_Biosignal_Data)!
 
 ---

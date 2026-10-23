@@ -35,4 +35,4 @@ To run experiments, execute: `python3 train.py` with the desired configuration s
 
 
 
-Example scripts will follow. If any documentation is unclear, feel free to contact me at: freek.hens@ru.nl
+Example scripts will follow. If any documentation is unclear, feel free to contact me at: freek.hens@outlook.com

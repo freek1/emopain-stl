@@ -12,7 +12,7 @@ import snntorch.functional as SF
 
 from utils.STAL import SpikeThresholdLearning as STL
 from utils.EncoderLoss import EncoderLoss
-from utils.RecurrentClassifier import RecurrentClassifier
+from utils.RecurrentClassifier import RecurrentClassifier, FullRecordingRecurrentClassifier
 
 def train_STL_encoder(encoder: STL, device: torch.device,
                       train_loader: DataLoader, val_loader: DataLoader,
@@ -212,7 +212,7 @@ def train_SRNN_classifier(batch_sz, data_type, num_steps, encoder, l1_cls, windo
     
     return classifier
 
-def train_SRNN_classifier_nowindow(batch_sz, n_spikes_per_timestep, n_channels, data_type, num_steps, encoder, l1_cls, l2_cls, window_size, stride, device, folder, suff, fold_num, classifier_epochs):    
+def train_SRNN_classifier_nowindow(batch_sz, n_spikes_per_timestep, n_channels, data_type, num_steps, encoder, l1_cls, l2_cls, window_size, stride, device, folder, suff, fold_num, classifier_epochs, classifier_lr=1e-5, full_recording=False):
     """ Same code as above, but without using windowed processing. Speeds up training (needs more VRAM)"""
     # Load spiketrains
     train_spiketrains = np.load(f"results/{folder}/spiketrains/train_{data_type}_{fold_num}{suff}.npy")
@@ -222,11 +222,15 @@ def train_SRNN_classifier_nowindow(batch_sz, n_spikes_per_timestep, n_channels, 
     test_spiketrains = np.load(f"results/{folder}/spiketrains/test_{data_type}_{fold_num}{suff}.npy")
     test_labels = np.load(f"results/{folder}/spiketrains/labels_test_{data_type}_{fold_num}{suff}.npy")
     
-    classifier = RecurrentClassifier(window_size=window_size, n_spikes_per_timestep=n_spikes_per_timestep, n_channels=n_channels, lif_beta=0.99, num_steps=num_steps, l1_sz=l1_cls, l2_sz=l2_cls, n_classes=2)
+    if full_recording:
+        classifier = FullRecordingRecurrentClassifier(train_spiketrains.shape[1], 0.99, l1_cls, num_steps)
+    else:
+        classifier = RecurrentClassifier(window_size=window_size, n_spikes_per_timestep=n_spikes_per_timestep, n_channels=n_channels, lif_beta=0.99, num_steps=num_steps, l1_sz=l1_cls, l2_sz=l2_cls, n_classes=2)
+    recurrent_steps = num_steps if full_recording else n_spikes_per_timestep
     print(f"Classifier params: \t{sum(p.numel() for p in classifier.parameters() if p.requires_grad)}")
     
     classifier.to(device)
-    lr = 1e-5
+    lr = classifier_lr
     classifier_optimizer = torch.optim.AdamW(classifier.parameters(), lr=lr)
     loss_fn = torch.nn.CrossEntropyLoss()
     
@@ -262,7 +266,7 @@ def train_SRNN_classifier_nowindow(batch_sz, n_spikes_per_timestep, n_channels, 
             _, preds = spk.sum(dim=0).max(1)
             
             loss = torch.zeros((1), dtype=torch.float, device=device)
-            for step in range(n_spikes_per_timestep):
+            for step in range(recurrent_steps):
                 loss += loss_fn(mem[step], y)
 
             loss.backward()
@@ -291,7 +295,7 @@ def train_SRNN_classifier_nowindow(batch_sz, n_spikes_per_timestep, n_channels, 
                 _, preds = spk.sum(dim=0).max(1)
                 
                 loss = torch.zeros((1), dtype=torch.float, device=device)
-                for step in range(n_spikes_per_timestep):
+                for step in range(recurrent_steps):
                     loss += loss_fn(mem[step], y)
                     
                 epoch_val_loss += loss.item()

@@ -1,6 +1,36 @@
 import torch
 import snntorch as snn
 
+class FullRecordingRecurrentClassifier(torch.nn.Module):
+    """Historical classifier used before the November 2024 temporal rewrite.
+
+    Each recurrent step receives the complete flattened encoded recording.
+    Parameter names and operations match the archived implementation so that
+    weights, outputs, and gradients can be compared directly.
+    """
+    def __init__(self, input_size, lif_beta, hidden_size, num_steps, n_classes=2, learn_beta=False):
+        super().__init__()
+        if num_steps < 1:
+            raise ValueError("num_steps must be positive")
+        self.num_steps = num_steps
+        self.fc1 = torch.nn.Linear(input_size, hidden_size)
+        self.rlif1 = snn.RLeaky(beta=lif_beta, linear_features=hidden_size, V=1, learn_beta=learn_beta)
+        self.fc2 = torch.nn.Linear(hidden_size, n_classes)
+        self.rlif2 = snn.RLeaky(beta=lif_beta, linear_features=n_classes, V=1, learn_beta=learn_beta)
+
+    def forward(self, x):
+        spk1, mem1 = self.rlif1.init_rleaky()
+        spk2, mem2 = self.rlif2.init_rleaky()
+        spk_rec, mem_rec = [], []
+        for _ in range(self.num_steps):
+            cur1 = self.fc1(x)
+            spk1, mem1 = self.rlif1(cur1, spk1, mem1)
+            cur2 = self.fc2(spk1)
+            spk2, mem2 = self.rlif2(cur2, spk2, mem2)
+            spk_rec.append(spk2)
+            mem_rec.append(mem2)
+        return torch.stack(spk_rec, dim=0), torch.stack(mem_rec, dim=0)
+
 class RecurrentClassifier(torch.nn.Module):
     """ Spiking Recurrent Neural Network (SRNN) implementation. 
     

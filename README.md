@@ -31,8 +31,19 @@ Set up the environment by (I used Python 3.10.6):
 2. `source .env/bin/activate` (or similar path for Windows)
 3. `pip3 install -r reqs.txt`
 
-To run experiments, execute: `python3 train.py` with the desired configuration specified inside the `train.py` file.
+For the restored paper-method profile, prepare the pain data according to
+[DATA_CONTRACT.md](DATA_CONTRACT.md), then run:
 
+```sh
+python -m unittest discover -s tests -v
+python train.py --data-dir data --output-dir reproduction-runs/paper-small
+```
 
+This defaults to six fresh fixed-settings training jobs: two selected LOO
+recordings across all three modalities. Use `--all-folds` only for an explicit
+full evaluation. See [REPRODUCTION.md](REPRODUCTION.md) for the effective settings,
+original-method provenance, archival profile, checkpoint corrections, resume
+behavior and known limits. The current code is a restoration candidate; fresh
+aggregate equivalence to the published results has not been established.
 
-Example scripts will follow. If any documentation is unclear, feel free to contact me at: freek.hens@ru.nl
+For questions about the code, contact [freek.hens@outlook.com](mailto:freek.hens@outlook.com).

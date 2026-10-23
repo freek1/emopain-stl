@@ -10,3 +10,9 @@ data/*.pickle
 *.npy
 
 .DS_Store
+
+# Fresh local reproduction outputs
+reproduction-runs/
+
+# Reproduction RNG and selected-model checkpoints
+*.pt

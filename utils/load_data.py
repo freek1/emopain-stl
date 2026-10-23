@@ -1,25 +1,27 @@
 import pickle
 import numpy as np
 import torch
+from pathlib import Path
 
-def load_data_emopain(data_type: str):
+def load_data_emopain(data_type: str, data_dir="data", task="protective"):
     """ 
     Returns input data and target labels, (n_samples, n_timesteps, n_channels).
     The data are normalized between [0, 1].
     """
     assert data_type in ["emg", "energy", "angle"], "data_type must be either 'emg', 'energy' or 'angle'."
 
-    suffix = ""
-    use_protective_label = True
-    if use_protective_label:
+    if task not in ("pain", "protective"):
+        raise ValueError("task must be 'pain' or 'protective'")
+    data_dir = Path(data_dir)
+    suffix = "_protect_kappa" if task == "protective" else ""
+    if task == "protective":
         print("----- NOTE:")
         print("SET TO USING RATER INFORMATION FOR PROTECTIVE LABELS")
-        suffix = {'_rater'}
     
     # Load data
-    with open(f'data/data_Cs_protect_kappa.pickle', 'rb') as f:
+    with open(data_dir / f'data_Cs{suffix}.pickle', 'rb') as f:
         data_Cs = pickle.load(f)
-    with open(f'data/data_Ps_protect_kappa.pickle', 'rb') as f:
+    with open(data_dir / f'data_Ps{suffix}.pickle', 'rb') as f:
         data_Ps = pickle.load(f)
     
     n_channels = 0 # placeholder
@@ -78,4 +80,3 @@ def load_data_emopain(data_type: str):
             input_data[s, :, chan] = x
     
     return input_data, target_labels
-    

@@ -21,6 +21,17 @@ from utils.load_data import load_data_emopain
 # See __main__ below for config settings.
 
 def main(config: dict, input_data: torch.Tensor, target_labels: torch.Tensor, fold_num: int, train_index: list, test_index: list, device: torch.device, folder: str):
+    if config.get("profile") == "paper":
+        from pathlib import Path
+        from utils.paper_pipeline import train_fold
+        result = train_fold(config, input_data, target_labels, train_index, test_index,
+                            fold_num, device, Path("results") / folder / "models" / f"{config['data_type']}_{fold_num}")
+        result_path = Path("results") / folder / f"results_{config['data_type']}{config['suff']}.csv"
+        result_path.parent.mkdir(parents=True, exist_ok=True)
+        frame = pd.read_csv(result_path) if result_path.exists() else pd.DataFrame()
+        pd.concat([frame, pd.DataFrame([result])], ignore_index=True).to_csv(result_path, index=False)
+        return result
+
     data_type = config["data_type"]
     batch_sz = config["batch_sz"]
     window_size = config["window_size"]
@@ -113,7 +124,7 @@ def main(config: dict, input_data: torch.Tensor, target_labels: torch.Tensor, fo
         classify_svm(n_spikes_per_timestep, n_channels, folder, data_type, suff, fold_num, avg_window_sz)
         
     if SRNN:
-        classifier = train_SRNN_classifier_nowindow(batch_sz, n_spikes_per_timestep, n_channels, data_type, num_steps, encoder, l1_cls, l2_cls, window_size, stride, device, folder, suff, fold_num, classifier_epochs)
+        classifier = train_SRNN_classifier_nowindow(batch_sz, n_spikes_per_timestep, n_channels, data_type, num_steps, encoder, l1_cls, l2_cls, window_size, stride, device, folder, suff, fold_num, classifier_epochs, classifier_lr=config.get("classifier_lr", 1e-5), full_recording=config.get("full_recording", False))
         classify_srnn_nowindow(classifier, 0, folder, data_type, fold_num, suff, device, window_size, n_channels, n_spikes_per_timestep)
         
 def generate_spiketrains(encoder, loader, fold_num, theta, suff, split, data_type, window_size, device, folder):
@@ -152,137 +163,6 @@ def generate_spiketrains(encoder, loader, fold_num, theta, suff, split, data_typ
             writer.writerow([fold_num, sparsity])
         
 if __name__ == "__main__":
-    mp.set_start_method('spawn') # Fix for Linux systems deadlock
-    torch.manual_seed(1957)
-    np.random.seed(1957)
-    
-    device = torch.device("cuda") # cuda
-
-    data_types = ["angle"] # emg, energy, angle
-    batch_sz = 46 # Gets overridden later for specific data_type
-    window_size = 3000 # Used for the encoder
-    stride = window_size // 4 # 75% overlap
-    n_spikes_per_timestep = 5
-    num_steps = 0 # Recurrent steps for the SRNN [unnused]
-    encoder_epochs = 30
-    classifier_epochs = 50
-    theta = 0.99 # Threshold parameter for making spiketrains (semi-binary floats to actual ints)
-    l1_sz = 3000 # Size of the first layer in the STL encoder
-    l2_sz = 3000 # Size of the second layer in the STL encoder
-    l1_cls = 500 # Size of the layer in the classifier
-    l2_cls = 0 # Set to 0 to ignore
-    drop_p = 0.5 # Dropout setting
-    encoding_method = "STL" # rate, latency, STL
-    # NOTE: To activate the STL-Stacked, set l1sz (and l2sz) to your liking > 0
-    #       To use STL-Vanilla, set l1_sz=l2_sz=0.
-    avg_window_sz = 100 # For averaging the spiketrains to use as features for the SVM classifier
-
-    generate_spikes = False # Override for making the spiketrains (if they are already generated in the folder)
-
-    # Set either one to True
-    SVM = False
-    SRNN = True
-    
-    # Batch sizes for each data type
-    bsz = [None, None, None]
-    if encoding_method == "rate":
-        suff = "_rate"
-        bsz = [32, 4, 16]
-    elif encoding_method == "latency":
-        suff = "_latency"
-        bsz = [4, 16, 16]
-    elif encoding_method == "STL" and l1_sz == 0:
-        suff = "_STL-V"
-        bsz = [8, 4, 8]
-    elif encoding_method == "STL" and l1_sz > 0:
-        suff = "_STL-S"
-        bsz = [32, 8, 16]
-        
-    # override bsz:
-    bsz = [4] * 3
-    
-    args = []
-    for data_type in data_types:
-        # Batch size findings from hyperparam search
-        if data_type == "emg":
-            batch_sz = bsz[0]
-        if data_type == "energy":
-            batch_sz = bsz[1]
-        if data_type == "angle":
-            batch_sz = bsz[2]
-        
-        config = {
-            "data_type": data_type,
-            "batch_sz": batch_sz,
-            "window_size": window_size,
-            "stride": stride,
-            "n_spikes_per_timestep": n_spikes_per_timestep,
-            "num_steps": num_steps,
-            "encoder_epochs": encoder_epochs,
-            "classifier_epochs": classifier_epochs,
-            "theta": theta,
-            "l1_sz": l1_sz,
-            "l2_sz": l2_sz,
-            "l1_cls": l1_cls,
-            "l2_cls": l2_cls,
-            "drop_p": drop_p,
-            "encoding_method": encoding_method,
-            "avg_window_sz": avg_window_sz,
-            "suff": suff,
-            "SVM": SVM,
-            "SRNN": SRNN,
-            "generate_spikes": generate_spikes
-        }
-        
-        # Leave One Subject Out crossval
-        cv = LeaveOneOut()
-        input_data, target_labels = load_data_emopain(data_type)
-        print(f"{data_type.capitalize()} data loaded:", input_data.shape, target_labels.shape)
-        
-        if SRNN:
-            # folder = f"fixmi/emopain_srnn_{n_spikes_per_timestep}sp_{drop_p}dp"
-            folder = f"emopain_protective_kappa"
-        elif SVM:
-            folder = f"emopain_svm_{n_spikes_per_timestep}sp"
-            
-        os.makedirs(f"results/{folder}", exist_ok=True)
-        os.makedirs(f"results/{folder}/spiketrains", exist_ok=True)
-        os.makedirs(f"imgs/{folder}", exist_ok=True) 
-
-        # Load the configurations in a list, to be executed later.
-        for fold_num, (train_index, test_index) in enumerate(cv.split(input_data, target_labels)):
-            cls = "svm" if SVM else "srnn" if SRNN else "---"
-            # Check if the spiketrain image is generated, if so, no need to compute whole fold again. 
-            if os.path.exists(f"imgs/{folder}/spiketrain_{cls}_{data_type}{suff}_{fold_num}.png"):    
-                print("Skipping fold", fold_num, data_type, suff)
-                continue 
-        
-            if not os.path.exists(f"results/{folder}/results_{data_type}{suff}.csv"):
-                df = pd.DataFrame(columns=["fold", "train_acc", "val_acc", "test_acc", "test_preds", "test_labels", "sparsity"])
-                df.set_index('fold', inplace=True)
-                df.to_csv(f"results/{folder}/results_{data_type}{suff}.csv", index=True)
-                
-                # To save sparsities for each subj
-                df = pd.DataFrame(columns=["fold", "sparsity"])
-                df.set_index('fold', inplace=True)
-                df.to_csv(f"results/{folder}/spiketrains/sparsities_{data_type}{suff}.csv", index=True)
-                
-            args.append((config, input_data, target_labels, fold_num, train_index, test_index, device, folder))
-            # Comment to run all subjects
-            # if len(args) == 1:
-            #     break
-            
-            # save config as json
-            with open(f"results/{folder}/config_{data_type}.json", "w") as f:
-                json.dump(config, f)
-    
-    print(f"Starting {len(args)} runs...")
-    start = time.time()
-    for arg in args:
-        main(*arg)
-    # Use code below to process in parallel.
-    # with mp.Pool(16) as p:
-    #     p.starmap(main, args)
-    
-    end = time.time()
-    print(f"{len(args)} runs took {(end-start)/60:.2f} minutes.")
+    # Both entry points use one explicit profile; no lower-level overrides.
+    from reproduce import run
+    run()

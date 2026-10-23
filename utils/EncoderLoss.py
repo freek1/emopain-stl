@@ -6,13 +6,16 @@ class EncoderLoss(torch.nn.Module):
     (Novel) Encoder Loss function L = L_MI + L_S
     Mutual Information part + Sparsity part.
     """
-    def __init__(self):
+    def __init__(self, mode="weighted"):
         super(EncoderLoss, self).__init__()
+        if mode not in ("weighted", "snn"):
+            raise ValueError("mode must be weighted or snn")
+        self.mode = mode
         self.__name__ = "EncoderLoss"
         print("EncoderLoss initialized.")
 
     def forward(self, W, X, Z1, Z2):
-        """
+        r"""
         W: torch.Tensor[batch, omega, psi], encoded 'spiketrain', not binarized yet (\hat{B} in the paper)
         X: torch.Tensor[batch, omega, psi], input signal (\hat{X} in the paper)
         Z1: torch.Tensor[batch, omega, psi], representation of Layer 1
@@ -35,14 +38,18 @@ class EncoderLoss(torch.nn.Module):
         # NOTE: Sum instead of mean, since mean will be around 0.5 or slightly lower or higher, because we have extremes [0, 1]
         # sum gives a semi-count of how many times we have near-1 values
         
-        mi = compute_mutual_information(X, W_weighted_sumspikes)
+        # Preserve the original research arithmetic explicitly, including its
+        # MI operator precedence; do not silently substitute a new objective.
+        mi_fn = compute_snn_mutual_information if self.mode == "snn" else compute_mutual_information
+        spike_sum = W_unflat.sum(dim=2) if self.mode == "snn" else W_weighted_sumspikes
+        mi = mi_fn(X, spike_sum)
         
         mi_Z1 = 0 
         mi_Z2 = 0
         if Z1 is not None:
-            mi_Z1 = compute_mutual_information(X, Z1)
+            mi_Z1 = mi_fn(X, Z1)
         if Z2 is not None:            
-            mi_Z2 = compute_mutual_information(X, Z2)
+            mi_Z2 = mi_fn(X, Z2)
         
         # Instead of punishing many spikes, i.e. every spike (L1 norm),
         # we can try punishing the difference in spikes from the area of the input signal
@@ -93,3 +100,22 @@ def compute_mutual_information(X, Z):
         
     mutual_information = joint_prob * torch.log2((joint_prob) / (px * pz))
     return mutual_information
+
+
+def compute_snn_mutual_information(X, Z):
+    """Arithmetic from emopain-snn bd50395d, not a corrected MI estimator.
+
+    The original expression is joint * log2((joint / px) * pz).
+    Tensor-valued epsilon also makes all-zero windows safe on CPU/CUDA.
+    """
+    if X.shape[0] != Z.shape[0]:
+        raise ValueError("X and Z must have the same number of samples")
+    if X.ndim == 3 and X.size(2) == 1:
+        X = X.squeeze(2)
+    joint = torch.mean(X * Z)
+    px, pz = X.mean(), Z.mean()
+    eps = joint.new_tensor(1e-12)
+    joint = torch.where(joint == 0, eps, joint)
+    px = torch.where(px == 0, eps, px)
+    pz = torch.where(pz == 0, eps, pz)
+    return joint * torch.log2((joint / px) * pz)
